@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 import os
-frofrom dotenv import load_dotenv
+from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +26,6 @@ class Settings(BaseModel):
     # Environment
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = os.getenv("DEBUG", "True").lower() == "true"
-["http://localhost:5173", "http://localhost:3000"]
+    allowed_origins: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
 
 settings = Settings()
