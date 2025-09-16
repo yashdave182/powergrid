@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { MapContainer, TileLayer, Marker, Popup, CircleMarker } from "react-leaflet";
 import { LatLngExpression } from "leaflet";
 import { BarChart3, Map, TrendingUp, Waves, Fish, Thermometer } from "lucide-react";
+import { useState } from "react";
 import "leaflet/dist/leaflet.css";
 
 // Fix for default markers in react-leaflet
