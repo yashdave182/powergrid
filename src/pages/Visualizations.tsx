@@ -13,16 +13,37 @@ import "leaflet/dist/leaflet.css";
 
 // Fix for default markers in react-leaflet
 import L from "leaflet";
-import icon from "leaflet/dist/images/marker-icon.png";
-import iconShadow from "leaflet/dist/images/marker-shadow.png";
 
-let DefaultIcon = L.divIcon({
-  html: `<div class="bg-blue-600 w-3 h-3 rounded-full border-2 border-white shadow-lg"></div>`,
-  iconSize: [12, 12],
-  className: "custom-div-icon",
+// Create a simple custom marker icon
+const customIcon = L.divIcon({
+  html: `
+    <div style="
+      background-color: #3b82f6;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 3px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    ">
+      <div style="
+        background-color: white;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+      "></div>
+    </div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 10],
+  popupAnchor: [0, -10],
+  className: "custom-marker-icon"
 });
 
-L.Marker.prototype.options.icon = DefaultIcon;
+// Set as default icon
+L.Marker.prototype.options.icon = customIcon;
 
 const Visualizations = () => {
   const [selectedDataset, setSelectedDataset] = useState("temperature");
