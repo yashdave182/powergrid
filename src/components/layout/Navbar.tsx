@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Waves, Database, BarChart3, Map, Wrench, Code } from "lucide-react";
+import { Menu, Waves, Database, BarChart3, Map, Wrench, Code, TestTube } from "lucide-react";
+import { useState } from "react";
 
 const navigationItems = [
   { name: "Dashboard", href: "/", icon: Waves },
@@ -11,6 +12,7 @@ const navigationItems = [
   { name: "Visualizations", href: "/visualizations", icon: Map },
   { name: "Tools", href: "/tools", icon: Wrench },
   { name: "API", href: "/api", icon: Code },
+  { name: "API Test", href: "/api-test", icon: TestTube },
 ];
 
 export const Navbar = () => {

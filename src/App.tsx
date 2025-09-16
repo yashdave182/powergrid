@@ -10,6 +10,7 @@ import Analytics from "./pages/Analytics";
 import Visualizations from "./pages/Visualizations";
 import Tools from "./pages/Tools";
 import Api from "./pages/Api";
+import ApiTest from "./pages/ApiTest";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/visualizations" element={<Visualizations />} />
             <Route path="/tools" element={<Tools />} />
             <Route path="/api" element={<Api />} />
+            <Route path="/api-test" element={<ApiTest />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

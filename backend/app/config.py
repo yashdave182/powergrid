@@ -1,17 +1,14 @@
 from pydantic import BaseModel
 from typing import Optional, List
 import os
-from dotenv import load_dotenv
+frofrom dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
 
 class Settings(BaseModel):
-    # Database - Multiple options for different environments
-    database_url: str = os.getenv(
-        "DATABASE_URL", 
-        "sqlite:///./marine_data.db"  # SQLite for development
-    )
+    # Database
+    database_url: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/marine_db")
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # API URLs
@@ -29,8 +26,6 @@ class Settings(BaseModel):
     # Environment
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = os.getenv("DEBUG", "True").lower() == "true"
-    
-    # CORS
-    allowed_origins: List[str] = ["http://localhost:5173", "http://localhost:3000"]
+["http://localhost:5173", "http://localhost:3000"]
 
 settings = Settings()
