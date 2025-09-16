@@ -7,8 +7,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Settings(BaseModel):
-    # Database
-    database_url: str = os.getenv("DATABASE_URL", "postgresql://user:password@localhost:5432/marine_db")
+    # Database - Multiple options for different environments
+    database_url: str = os.getenv(
+        "DATABASE_URL", 
+        "sqlite:///./marine_data.db"  # SQLite for development
+    )
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # API URLs
