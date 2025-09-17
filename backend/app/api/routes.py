@@ -8,6 +8,11 @@ api_router = APIRouter()
 async def api_health_check():
     return {"status": "healthy", "message": "Marine Data Platform API v1 is running"}
 
+# Explicit OPTIONS handler for API health endpoint
+@api_router.options("/health")
+async def api_health_check_options():
+    return {}
+
 # Include all API route modules
 api_router.include_router(
     biodiversity.router,

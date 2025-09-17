@@ -48,7 +48,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=cors_allow_credentials,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -71,6 +71,11 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "message": "Marine Data Platform API is running"}
+
+# Explicit OPTIONS handler for health endpoint
+@app.options("/health")
+async def health_check_options():
+    return {}
 
 # Root endpoint
 @app.get("/")
