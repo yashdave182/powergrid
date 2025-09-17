@@ -82,6 +82,11 @@ export const biodiversityApi = {
   testConfiguration: async () => {
     return apiService.get('/biodiversity/test/config');
   },
+
+  // Test configuration
+  testConfiguration: async () => {
+    return apiService.get('/biodiversity/test/config');
+  },
 };
 
 // Oceanography API Services
