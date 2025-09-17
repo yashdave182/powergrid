@@ -161,35 +161,6 @@ const ApiTest = () => {
       } else {
         toast({
           title: "Configuration Test Complete",
-          description: "Check results for detailed information",
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to test configuration",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const testConfiguration = async () => {
-    setLoading(true);
-    try {
-      const response = await biodiversityApi.testConfiguration();
-      setResults(response);
-      
-      if (response.error) {
-        toast({
-          title: "Configuration Test Failed",
-          description: response.error,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Configuration Test Complete",
           description: "Check results for network and API status",
         });
       }
