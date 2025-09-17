@@ -12,7 +12,8 @@ class OBISClient:
     
     def __init__(self):
         self.base_url = settings.obis_api_url
-        self.client = httpx.AsyncClient(timeout=30.0)
+        # Increase timeout for OBIS API which can be slow
+        self.client = httpx.AsyncClient(timeout=60.0, follow_redirects=True)
     
     async def close(self):
         await self.client.aclose()
