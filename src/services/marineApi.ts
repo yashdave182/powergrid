@@ -77,6 +77,11 @@ export const biodiversityApi = {
   testObisConnection: async () => {
     return apiService.get('/biodiversity/test/obis');
   },
+
+  // Test configuration
+  testConfiguration: async () => {
+    return apiService.get('/biodiversity/test/config');
+  },
 };
 
 // Oceanography API Services

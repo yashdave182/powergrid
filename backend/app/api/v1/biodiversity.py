@@ -121,7 +121,19 @@ async def get_datasets(
     try:
         datasets = await obis_client.get_datasets(limit=limit)
         
+        # Handle both successful responses and error responses from the client
+        if "error" in datasets:
+            return {
+                "status": "error",
+                "message": datasets["error"],
+                "details": datasets.get("details", ""),
+                "total_datasets": 0,
+                "datasets": [],
+                "source": "OBIS"
+            }
+        
         return {
+            "status": "success",
             "total_datasets": len(datasets.get("results", [])),
             "datasets": datasets,
             "source": "OBIS"
@@ -129,7 +141,13 @@ async def get_datasets(
         
     except Exception as e:
         logger.error(f"Failed to get datasets: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve datasets: {str(e)}")
+        return {
+            "status": "error",
+            "message": f"Unexpected error: {str(e)}",
+            "total_datasets": 0,
+            "datasets": [],
+            "source": "OBIS"
+        }
 
 @router.get("/checklist")
 async def get_species_checklist(
@@ -203,26 +221,97 @@ async def get_data_providers():
 async def test_obis_connection():
     """Test OBIS API connection with a simple request"""
     try:
-        # Test with a simple species search
-        test_data = await obis_client.search_species(
-            scientific_name="Mola mola",
-            limit=5
-        )
+        import httpx
         
-        return {
-            "status": "success",
-            "message": "OBIS API connection working",
-            "test_query": "Mola mola (limit 5)",
-            "total_records": test_data.get("total", 0),
-            "sample_data": test_data.get("results", [])[:2] if test_data.get("results") else [],
-            "obis_response_keys": list(test_data.keys()) if isinstance(test_data, dict) else "not dict"
-        }
-        
+        # Direct test without using the client
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Test 1: Basic API availability
+            test_url = "https://api.obis.org/v3/occurrence?limit=5"
+            logger.info(f"Testing OBIS API directly: {test_url}")
+            
+            response = await client.get(test_url)
+            logger.info(f"Direct OBIS test response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                return {
+                    "status": "success",
+                    "message": "OBIS API v3 connection working",
+                    "test_url": test_url,
+                    "total_records": data.get("total", 0),
+                    "sample_count": len(data.get("results", [])),
+                    "api_response_keys": list(data.keys()) if isinstance(data, dict) else "not dict"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"OBIS API returned status {response.status_code}",
+                    "response_text": response.text[:500],
+                    "test_url": test_url
+                }
+                
     except Exception as e:
         logger.error(f"OBIS connection test failed: {e}")
         return {
             "status": "error",
             "message": f"OBIS API connection failed: {str(e)}",
+            "error_type": type(e).__name__,
+            "test_url": "https://api.obis.org/v3/occurrence?limit=5"
+        }
+
+@router.get("/test/config")
+async def test_configuration():
+    """Test API configuration and network connectivity"""
+    try:
+        from app.config import settings
+        import httpx
+        
+        # Test basic configuration
+        config_info = {
+            "obis_api_url": settings.obis_api_url,
+            "gbif_api_url": settings.gbif_api_url,
+            "environment": settings.environment,
+            "debug": settings.debug
+        }
+        
+        # Test basic network connectivity
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                # Test if we can reach the internet
+                response = await client.get("https://httpbin.org/json")
+                network_test = {
+                    "status": "success" if response.status_code == 200 else "failed",
+                    "status_code": response.status_code
+                }
+            except Exception as e:
+                network_test = {
+                    "status": "failed",
+                    "error": str(e)
+                }
+            
+            # Test OBIS API base URL
+            try:
+                response = await client.get("https://api.obis.org/")
+                obis_base_test = {
+                    "status": "success" if response.status_code == 200 else "failed",
+                    "status_code": response.status_code
+                }
+            except Exception as e:
+                obis_base_test = {
+                    "status": "failed",
+                    "error": str(e)
+                }
+        
+        return {
+            "configuration": config_info,
+            "network_test": network_test,
+            "obis_base_test": obis_base_test
+        }
+        
+    except Exception as e:
+        logger.error(f"Configuration test failed: {e}")
+        return {
+            "error": f"Configuration test failed: {str(e)}",
             "error_type": type(e).__name__
         }
 

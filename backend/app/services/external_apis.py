@@ -24,16 +24,7 @@ class OBISClient:
                            end_date: Optional[str] = None,
                            limit: int = 100,
                            offset: int = 0) -> Dict[str, Any]:
-        """Search for species occurrences in OBIS v3 API
-        
-        Args:
-            scientific_name: Scientific name (e.g., "Mola mola")
-            geometry: WKT geometry (e.g., "POLYGON((...))") 
-            start_date: Start date in YYYY-MM-DD format
-            end_date: End date in YYYY-MM-DD format
-            limit: Maximum number of results (default 100)
-            offset: Number of results to skip (default 0)
-        """
+        """Search for species occurrences in OBIS v3 API"""
         try:
             params: Dict[str, str] = {
                 "limit": str(limit),
@@ -49,20 +40,32 @@ class OBISClient:
             if end_date:
                 params["enddate"] = end_date
             
-            logger.info(f"OBIS occurrence request to: {self.base_url}occurrence with params: {params}")
-            response = await self.client.get(f"{self.base_url}occurrence", params=params)
-            response.raise_for_status()
+            url = f"{self.base_url}occurrence"
+            logger.info(f"OBIS occurrence request: {url} with params: {params}")
+            
+            response = await self.client.get(url, params=params)
+            logger.info(f"OBIS response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"OBIS API returned status {response.status_code}: {response.text}")
+                return {
+                    "error": f"OBIS API returned status {response.status_code}",
+                    "details": response.text,
+                    "total": 0,
+                    "results": []
+                }
             
             data = response.json()
-            logger.info(f"OBIS occurrence response successful, found {data.get('total', 0)} records")
+            logger.info(f"OBIS response successful: {data.get('total', 0)} records found")
             return data
             
-        except httpx.HTTPStatusError as e:
-            logger.error(f"OBIS occurrence HTTP error {e.response.status_code}: {e.response.text}")
-            raise HTTPException(status_code=e.response.status_code, detail=f"OBIS API error: {e.response.text}")
         except Exception as e:
-            logger.error(f"OBIS occurrence request failed: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to search species: {str(e)}")
+            logger.error(f"OBIS occurrence request failed: {str(e)}")
+            return {
+                "error": f"Connection failed: {str(e)}",
+                "total": 0,
+                "results": []
+            }
     
     async def get_taxa_info(self, taxon_id: int) -> Dict[str, Any]:
         """Get detailed taxonomic information"""
@@ -103,21 +106,33 @@ class OBISClient:
         """Get dataset metadata from OBIS v3 API"""
         try:
             params = {"limit": str(limit)}
-            logger.info(f"OBIS datasets request to: {self.base_url}dataset")
+            url = f"{self.base_url}dataset"
             
-            response = await self.client.get(f"{self.base_url}dataset", params=params)
-            response.raise_for_status()
+            logger.info(f"OBIS datasets request: {url} with params: {params}")
+            
+            response = await self.client.get(url, params=params)
+            logger.info(f"OBIS datasets response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"OBIS datasets API returned status {response.status_code}: {response.text}")
+                return {
+                    "error": f"OBIS API returned status {response.status_code}",
+                    "details": response.text,
+                    "total": 0,
+                    "results": []
+                }
             
             data = response.json()
-            logger.info(f"OBIS datasets response successful, data type: {type(data)}")
+            logger.info(f"OBIS datasets response successful: {len(data.get('results', []))} datasets found")
             return data
             
-        except httpx.HTTPStatusError as e:
-            logger.error(f"OBIS datasets HTTP error {e.response.status_code}: {e.response.text}")
-            raise HTTPException(status_code=e.response.status_code, detail=f"OBIS API error: {e.response.text}")
         except Exception as e:
-            logger.error(f"Failed to get datasets: {e}")
-            raise HTTPException(status_code=500, detail=f"Failed to retrieve datasets: {str(e)}")
+            logger.error(f"OBIS datasets request failed: {str(e)}")
+            return {
+                "error": f"Connection failed: {str(e)}",
+                "total": 0,
+                "results": []
+            }
     
     async def get_checklist(self, 
                           geometry: Optional[str] = None,
