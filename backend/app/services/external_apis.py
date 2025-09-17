@@ -135,6 +135,32 @@ class OBISClient:
                 "results": []
             }
     
+    async def get_dataset_details(self, dataset_id: str) -> Dict[str, Any]:
+        """Get detailed information about a specific dataset"""
+        try:
+            url = f"{self.base_url}dataset/{dataset_id}"
+            logger.info(f"OBIS dataset details request: {url}")
+            
+            response = await self.client.get(url)
+            logger.info(f"OBIS dataset details response status: {response.status_code}")
+            
+            if response.status_code != 200:
+                logger.error(f"OBIS dataset details API returned status {response.status_code}: {response.text}")
+                return {
+                    "error": f"OBIS API returned status {response.status_code}",
+                    "details": response.text
+                }
+            
+            data = response.json()
+            logger.info(f"OBIS dataset details response successful for dataset {dataset_id}")
+            return data
+            
+        except Exception as e:
+            logger.error(f"OBIS dataset details request failed: {str(e)}")
+            return {
+                "error": f"Connection failed: {str(e)}"
+            }
+    
     async def get_checklist(self, 
                           geometry: Optional[str] = None,
                           taxon_id: Optional[int] = None,

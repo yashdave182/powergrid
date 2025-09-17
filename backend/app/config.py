@@ -24,6 +24,7 @@ class Settings(BaseModel):
     
     # LLM API
     groq_api_key: str = os.getenv("GROQ_API_KEY", "your-groq-api-key-here")
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "your-gemini-api-key-here")
     
     # Security
     secret_key: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")

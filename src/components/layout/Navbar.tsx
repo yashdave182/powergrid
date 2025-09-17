@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Menu, Waves, Database, BarChart3, Map, Wrench, Code, TestTube } from "lucide-react";
-import { useState } from "react";
+import { Menu, Waves, Database, BarChart3, Map, Wrench, Code, TestTube, Brain } from "lucide-react";
 
 const navigationItems = [
   { name: "Dashboard", href: "/", icon: Waves },
@@ -11,6 +10,7 @@ const navigationItems = [
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Visualizations", href: "/visualizations", icon: Map },
   { name: "Tools", href: "/tools", icon: Wrench },
+  { name: "AI Integration", href: "/ai", icon: Brain },
   { name: "API", href: "/api", icon: Code },
   { name: "API Test", href: "/api-test", icon: TestTube },
 ];

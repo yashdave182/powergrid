@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import biodiversity, oceanography, data_integration, analytics
+from app.api.v1 import biodiversity, oceanography, data_integration, analytics, ai
 
 api_router = APIRouter()
 
@@ -36,4 +36,10 @@ api_router.include_router(
     analytics.router,
     prefix="/analytics",
     tags=["analytics"]
+)
+
+api_router.include_router(
+    ai.router,
+    prefix="/ai",
+    tags=["ai"]
 )
