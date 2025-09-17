@@ -21,12 +21,22 @@ class OBISClient:
                            geometry: Optional[str] = None,
                            start_date: Optional[str] = None,
                            end_date: Optional[str] = None,
-                           limit: int = 100) -> Dict[str, Any]:
-        """Search for species occurrences in OBIS"""
+                           limit: int = 100,
+                           offset: int = 0) -> Dict[str, Any]:
+        """Search for species occurrences in OBIS
+        
+        Args:
+            scientific_name: Scientific name (e.g., "Mola mola")
+            geometry: WKT geometry (e.g., "POLYGON((...))") 
+            start_date: Start date in YYYY-MM-DD format
+            end_date: End date in YYYY-MM-DD format
+            limit: Maximum number of results (default 100)
+            offset: Number of results to skip (default 0)
+        """
         try:
             params: Dict[str, str] = {
                 "limit": str(limit),
-                "offset": "0"
+                "offset": str(offset)
             }
             
             if scientific_name:
@@ -57,6 +67,77 @@ class OBISClient:
             return response.json()
         except Exception as e:
             logger.error(f"Failed to get taxa info: {e}")
+            raise
+    
+    async def search_taxa(self, 
+                         scientific_name: Optional[str] = None,
+                         rank: Optional[str] = None,
+                         limit: int = 100) -> Dict[str, Any]:
+        """Search for taxonomic information
+        
+        Args:
+            scientific_name: Scientific name to search for
+            rank: Taxonomic rank (e.g., 'species', 'genus', 'family')
+            limit: Maximum number of results
+        """
+        try:
+            params: Dict[str, str] = {"limit": str(limit)}
+            if scientific_name:
+                params["scientificname"] = scientific_name
+            if rank:
+                params["rank"] = rank
+                
+            response = await self.client.get(f"{self.base_url}taxon", params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to search taxa: {e}")
+            raise
+    
+    async def get_datasets(self, limit: int = 100) -> Dict[str, Any]:
+        """Get dataset metadata from OBIS"""
+        try:
+            params = {"limit": str(limit)}
+            response = await self.client.get(f"{self.base_url}dataset", params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get datasets: {e}")
+            raise
+    
+    async def get_checklist(self, 
+                          geometry: Optional[str] = None,
+                          taxon_id: Optional[int] = None,
+                          limit: int = 100) -> Dict[str, Any]:
+        """Get species checklist for a region or taxonomic group
+        
+        Args:
+            geometry: WKT geometry for spatial filtering
+            taxon_id: Taxonomic ID to filter by
+            limit: Maximum number of results
+        """
+        try:
+            params: Dict[str, str] = {"limit": str(limit)}
+            if geometry:
+                params["geometry"] = geometry
+            if taxon_id:
+                params["taxonid"] = str(taxon_id)
+                
+            response = await self.client.get(f"{self.base_url}checklist", params=params)
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get checklist: {e}")
+            raise
+    
+    async def get_nodes(self) -> Dict[str, Any]:
+        """Get OBIS data provider nodes"""
+        try:
+            response = await self.client.get(f"{self.base_url}node")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.error(f"Failed to get nodes: {e}")
             raise
     
     async def get_statistics(self, geometry: Optional[str] = None) -> Dict[str, Any]:

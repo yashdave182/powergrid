@@ -44,6 +44,34 @@ export const biodiversityApi = {
 
     return apiService.get(`/biodiversity/edna/analysis?${queryParams}`);
   },
+
+  // Get datasets
+  getDatasets: async (limit: number = 100) => {
+    return apiService.get(`/biodiversity/datasets?limit=${limit}`);
+  },
+
+  // Get species checklist
+  getSpeciesChecklist: async (region?: string, taxonId?: number, limit: number = 100) => {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    if (region) queryParams.append('region', region);
+    if (taxonId) queryParams.append('taxon_id', taxonId.toString());
+
+    return apiService.get(`/biodiversity/checklist?${queryParams}`);
+  },
+
+  // Search taxa
+  searchTaxa: async (scientificName?: string, rank?: string, limit: number = 100) => {
+    const queryParams = new URLSearchParams({ limit: limit.toString() });
+    if (scientificName) queryParams.append('scientific_name', scientificName);
+    if (rank) queryParams.append('rank', rank);
+
+    return apiService.get(`/biodiversity/taxa/search?${queryParams}`);
+  },
+
+  // Get data providers
+  getDataProviders: async () => {
+    return apiService.get('/biodiversity/nodes');
+  },
 };
 
 // Oceanography API Services

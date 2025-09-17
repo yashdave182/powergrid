@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import { biodiversityApi, oceanographyApi, healthApi } from "@/services/marineApi";
-import { Loader2, Search, TestTube, Waves } from "lucide-react";
+import { Loader2, Search, TestTube, Waves, Fish } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const ApiTest = () => {
@@ -57,9 +57,10 @@ const ApiTest = () => {
 
     setLoading(true);
     try {
+      // Test with real OBIS data
       const response = await biodiversityApi.searchSpecies({
         scientific_name: searchTerm,
-        data_source: 'both',
+        data_source: 'obis', // Test OBIS specifically
         limit: 10
       });
       setResults(response);
@@ -73,13 +74,42 @@ const ApiTest = () => {
       } else {
         toast({
           title: "Species Search Successful",
-          description: `Found data from ${response.data?.total_sources || 0} sources`,
+          description: `Found ${response.data?.results?.obis?.results?.length || 0} OBIS records`,
         });
       }
     } catch (error) {
       toast({
         title: "Error",
         description: "Species search failed",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const testOBISDatasets = async () => {
+    setLoading(true);
+    try {
+      const response = await biodiversityApi.getDatasets(20);
+      setResults(response);
+      
+      if (response.error) {
+        toast({
+          title: "OBIS Datasets Failed",
+          description: response.error,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "OBIS Datasets Retrieved",
+          description: `Datasets retrieved successfully`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to get OBIS datasets",
         variant: "destructive",
       });
     } finally {
@@ -129,9 +159,10 @@ const ApiTest = () => {
         </div>
 
         <Tabs defaultValue="health" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+          <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
             <TabsTrigger value="health">Health</TabsTrigger>
             <TabsTrigger value="species">Species</TabsTrigger>
+            <TabsTrigger value="obis">OBIS API</TabsTrigger>
             <TabsTrigger value="ocean">Ocean Data</TabsTrigger>
           </TabsList>
 
@@ -181,6 +212,35 @@ const ApiTest = () => {
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Search Species
                 </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="obis" className="space-y-6">
+            <Card className="shadow-float">
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Fish className="h-5 w-5" />
+                  <span>OBIS API Testing</span>
+                </CardTitle>
+                <CardDescription>
+                  Test direct integration with Ocean Biodiversity Information System
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Button onClick={testOBISDatasets} disabled={loading} className="w-full">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Get OBIS Datasets
+                </Button>
+                
+                <div className="text-sm text-muted-foreground">
+                  <p><strong>Testing real OBIS API endpoints:</strong></p>
+                  <ul className="list-disc list-inside mt-1">
+                    <li>Dataset metadata retrieval</li>
+                    <li>Species occurrence data</li>
+                    <li>Taxonomic information</li>
+                  </ul>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

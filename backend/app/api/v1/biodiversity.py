@@ -113,7 +113,93 @@ async def get_biodiversity_statistics(
         
     except Exception as e:
         logger.error(f"Failed to get biodiversity statistics: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve statistics: {str(e)}")
+@router.get("/datasets")
+async def get_datasets(
+    limit: int = Query(100, description="Maximum number of datasets to return")
+):
+    """Get marine biodiversity datasets from OBIS"""
+    try:
+        datasets = await obis_client.get_datasets(limit=limit)
+        
+        return {
+            "total_datasets": len(datasets.get("results", [])),
+            "datasets": datasets,
+            "source": "OBIS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get datasets: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve datasets: {str(e)}")
+
+@router.get("/checklist")
+async def get_species_checklist(
+    region: Optional[str] = Query(None, description="Geographic region (WKT format)"),
+    taxon_id: Optional[int] = Query(None, description="Taxonomic ID to filter by"),
+    limit: int = Query(100, description="Maximum number of species")
+):
+    """Get species checklist for a region or taxonomic group"""
+    try:
+        checklist = await obis_client.get_checklist(
+            geometry=region,
+            taxon_id=taxon_id,
+            limit=limit
+        )
+        
+        return {
+            "region": region,
+            "taxon_id": taxon_id,
+            "checklist": checklist,
+            "total_species": len(checklist.get("results", [])),
+            "source": "OBIS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get checklist: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve checklist: {str(e)}")
+
+@router.get("/taxa/search")
+async def search_taxa(
+    scientific_name: Optional[str] = Query(None, description="Scientific name to search for"),
+    rank: Optional[str] = Query(None, description="Taxonomic rank (species, genus, family, etc.)"),
+    limit: int = Query(100, description="Maximum number of results")
+):
+    """Search for taxonomic information in OBIS"""
+    try:
+        taxa_data = await obis_client.search_taxa(
+            scientific_name=scientific_name,
+            rank=rank,
+            limit=limit
+        )
+        
+        return {
+            "query": {
+                "scientific_name": scientific_name,
+                "rank": rank
+            },
+            "taxa": taxa_data,
+            "total_results": len(taxa_data.get("results", [])),
+            "source": "OBIS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to search taxa: {e}")
+        raise HTTPException(status_code=500, detail=f"Taxa search failed: {str(e)}")
+
+@router.get("/nodes")
+async def get_data_providers():
+    """Get OBIS data provider nodes"""
+    try:
+        nodes = await obis_client.get_nodes()
+        
+        return {
+            "nodes": nodes,
+            "total_providers": len(nodes.get("results", [])),
+            "source": "OBIS"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get data providers: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve data providers: {str(e)}")
 
 @router.post("/species/identify")
 async def identify_species(
