@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import uvicorn
 import logging
+import os
 
 from app.config import settings
 from app.api.routes import api_router
@@ -23,6 +24,13 @@ app = FastAPI(
 
 # Add CORS middleware
 # Compute safe CORS settings: Star origin cannot be used with credentials=True
+
+# Debug: Print environment variables
+logger.info("DEBUG environment: %s", settings.debug)
+logger.info("ENVIRONMENT: %s", settings.environment)
+logger.info("Raw ALLOWED_ORIGINS env var: %s", os.getenv('ALLOWED_ORIGINS'))
+logger.info("Parsed allowed_origins: %s", settings.allowed_origins)
+
 if settings.debug:
     cors_origins = ["*"]
     cors_allow_credentials = False
@@ -36,7 +44,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=cors_allow_credentials,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 

@@ -9,7 +9,8 @@ load_dotenv()
 # Parse allowed origins from comma-separated env var if provided
 _allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
 _default_allowed = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
-_parsed_allowed = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()] if _allowed_origins_env else _default_allowed
+_production_allowed = ["https://sih-xi-ochre.vercel.app", "http://localhost:5173", "http://localhost:3000"]
+_parsed_allowed = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()] if _allowed_origins_env else (_production_allowed if os.getenv("ENVIRONMENT") == "production" else _default_allowed)
 
 
 class Settings(BaseModel):
