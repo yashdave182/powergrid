@@ -3,8 +3,14 @@ from typing import Optional, List
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables from .env file (useful for local development)
 load_dotenv()
+
+# Parse allowed origins from comma-separated env var if provided
+_allowed_origins_env = os.getenv("ALLOWED_ORIGINS")
+_default_allowed = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
+_parsed_allowed = [o.strip() for o in _allowed_origins_env.split(",") if o.strip()] if _allowed_origins_env else _default_allowed
+
 
 class Settings(BaseModel):
     # Database
@@ -26,6 +32,7 @@ class Settings(BaseModel):
     # Environment
     environment: str = os.getenv("ENVIRONMENT", "development")
     debug: bool = os.getenv("DEBUG", "True").lower() == "true"
-    allowed_origins: List[str] = ["http://localhost:5173", "http://localhost:3000", "http://localhost:8080"]
+    allowed_origins: List[str] = _parsed_allowed
+
 
 settings = Settings()

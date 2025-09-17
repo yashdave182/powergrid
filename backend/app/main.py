@@ -22,10 +22,20 @@ app = FastAPI(
 )
 
 # Add CORS middleware
+# Compute safe CORS settings: Star origin cannot be used with credentials=True
+if settings.debug:
+    cors_origins = ["*"]
+    cors_allow_credentials = False
+else:
+    cors_origins = settings.allowed_origins
+    cors_allow_credentials = True
+
+logger.info("CORS configuration: origins=%s, allow_credentials=%s", cors_origins, cors_allow_credentials)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins + ["*"] if settings.debug else settings.allowed_origins,
-    allow_credentials=True,
+    allow_origins=cors_origins,
+    allow_credentials=cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

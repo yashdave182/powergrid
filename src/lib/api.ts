@@ -1,5 +1,5 @@
 // API Configuration and Base Service
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/,'');
 
 export interface ApiResponse<T> {
   data?: T;
@@ -19,7 +19,9 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     try {
-      const url = `${this.baseUrl}${endpoint}`;
+      // Ensure endpoint starts with a single '/'
+      const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      const url = `${this.baseUrl}${normalizedEndpoint}`;
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
