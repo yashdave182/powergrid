@@ -199,7 +199,32 @@ async def get_data_providers():
         
     except Exception as e:
         logger.error(f"Failed to get data providers: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to retrieve data providers: {str(e)}")
+@router.get("/test/obis")
+async def test_obis_connection():
+    """Test OBIS API connection with a simple request"""
+    try:
+        # Test with a simple species search
+        test_data = await obis_client.search_species(
+            scientific_name="Mola mola",
+            limit=5
+        )
+        
+        return {
+            "status": "success",
+            "message": "OBIS API connection working",
+            "test_query": "Mola mola (limit 5)",
+            "total_records": test_data.get("total", 0),
+            "sample_data": test_data.get("results", [])[:2] if test_data.get("results") else [],
+            "obis_response_keys": list(test_data.keys()) if isinstance(test_data, dict) else "not dict"
+        }
+        
+    except Exception as e:
+        logger.error(f"OBIS connection test failed: {e}")
+        return {
+            "status": "error",
+            "message": f"OBIS API connection failed: {str(e)}",
+            "error_type": type(e).__name__
+        }
 
 @router.post("/species/identify")
 async def identify_species(

@@ -72,6 +72,11 @@ export const biodiversityApi = {
   getDataProviders: async () => {
     return apiService.get('/biodiversity/nodes');
   },
+
+  // Test OBIS connection
+  testObisConnection: async () => {
+    return apiService.get('/biodiversity/test/obis');
+  },
 };
 
 // Oceanography API Services

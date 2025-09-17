@@ -117,6 +117,35 @@ const ApiTest = () => {
     }
   };
 
+  const testOBISConnection = async () => {
+    setLoading(true);
+    try {
+      const response = await biodiversityApi.testObisConnection();
+      setResults(response);
+      
+      if (response.error) {
+        toast({
+          title: "OBIS Connection Failed",
+          description: response.error,
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "OBIS Connection Successful",
+          description: `Connected to OBIS API successfully`,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to test OBIS connection",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const testOceanographyAPI = async () => {
     setLoading(true);
     try {
@@ -228,6 +257,11 @@ const ApiTest = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <Button onClick={testOBISConnection} disabled={loading} className="w-full">
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Test OBIS Connection
+                </Button>
+                
                 <Button onClick={testOBISDatasets} disabled={loading} className="w-full">
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Get OBIS Datasets
