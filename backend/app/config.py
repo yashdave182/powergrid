@@ -19,7 +19,7 @@ class Settings(BaseModel):
     redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379")
     
     # API URLs
-    obis_api_url: str = os.getenv("OBIS_API_URL", "https://api.obis.org/")
+    obis_api_url: str = os.getenv("OBIS_API_URL", "https://api.obis.org/v3/")
     gbif_api_url: str = os.getenv("GBIF_API_URL", "https://api.gbif.org/v1/")
     
     # LLM API

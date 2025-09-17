@@ -1,6 +1,7 @@
 import httpx
 import asyncio
 from typing import Dict, List, Optional, Any
+from fastapi import HTTPException
 from app.config import settings
 import logging
 
@@ -23,7 +24,7 @@ class OBISClient:
                            end_date: Optional[str] = None,
                            limit: int = 100,
                            offset: int = 0) -> Dict[str, Any]:
-        """Search for species occurrences in OBIS
+        """Search for species occurrences in OBIS v3 API
         
         Args:
             scientific_name: Scientific name (e.g., "Mola mola")
@@ -48,16 +49,20 @@ class OBISClient:
             if end_date:
                 params["enddate"] = end_date
             
+            logger.info(f"OBIS occurrence request to: {self.base_url}occurrence with params: {params}")
             response = await self.client.get(f"{self.base_url}occurrence", params=params)
             response.raise_for_status()
-            return response.json()
             
-        except httpx.RequestError as e:
-            logger.error(f"OBIS API request failed: {e}")
-            raise
+            data = response.json()
+            logger.info(f"OBIS occurrence response successful, found {data.get('total', 0)} records")
+            return data
+            
         except httpx.HTTPStatusError as e:
-            logger.error(f"OBIS API HTTP error: {e}")
-            raise
+            logger.error(f"OBIS occurrence HTTP error {e.response.status_code}: {e.response.text}")
+            raise HTTPException(status_code=e.response.status_code, detail=f"OBIS API error: {e.response.text}")
+        except Exception as e:
+            logger.error(f"OBIS occurrence request failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to search species: {str(e)}")
     
     async def get_taxa_info(self, taxon_id: int) -> Dict[str, Any]:
         """Get detailed taxonomic information"""
@@ -95,15 +100,24 @@ class OBISClient:
             raise
     
     async def get_datasets(self, limit: int = 100) -> Dict[str, Any]:
-        """Get dataset metadata from OBIS"""
+        """Get dataset metadata from OBIS v3 API"""
         try:
             params = {"limit": str(limit)}
+            logger.info(f"OBIS datasets request to: {self.base_url}dataset")
+            
             response = await self.client.get(f"{self.base_url}dataset", params=params)
             response.raise_for_status()
-            return response.json()
+            
+            data = response.json()
+            logger.info(f"OBIS datasets response successful, data type: {type(data)}")
+            return data
+            
+        except httpx.HTTPStatusError as e:
+            logger.error(f"OBIS datasets HTTP error {e.response.status_code}: {e.response.text}")
+            raise HTTPException(status_code=e.response.status_code, detail=f"OBIS API error: {e.response.text}")
         except Exception as e:
             logger.error(f"Failed to get datasets: {e}")
-            raise
+            raise HTTPException(status_code=500, detail=f"Failed to retrieve datasets: {str(e)}")
     
     async def get_checklist(self, 
                           geometry: Optional[str] = None,
