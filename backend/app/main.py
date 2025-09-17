@@ -35,8 +35,12 @@ if settings.debug:
     cors_origins = ["*"]
     cors_allow_credentials = False
 else:
-    cors_origins = settings.allowed_origins
-    cors_allow_credentials = True
+    # Temporarily allow all origins for debugging
+    cors_origins = ["*"]
+    cors_allow_credentials = False
+    # Production config:
+    # cors_origins = settings.allowed_origins
+    # cors_allow_credentials = True
 
 logger.info("CORS configuration: origins=%s, allow_credentials=%s", cors_origins, cors_allow_credentials)
 

@@ -22,6 +22,12 @@ class ApiService {
       // Ensure endpoint starts with a single '/'
       const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
       const url = `${this.baseUrl}${normalizedEndpoint}`;
+      
+      // Debug: Log the actual URL being called
+      console.log('API Request URL:', url);
+      console.log('Base URL:', this.baseUrl);
+      console.log('Endpoint:', normalizedEndpoint);
+      
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -38,6 +44,7 @@ class ApiService {
         status: response.status,
       };
     } catch (error) {
+      console.error('API Request Error:', error);
       return {
         error: error instanceof Error ? error.message : 'Network error',
         status: 0,
