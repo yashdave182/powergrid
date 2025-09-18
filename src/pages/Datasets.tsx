@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +15,8 @@ import {
   Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { obisGeminiService, obisDataService } from '@/services/obisGeminiService';
+import { obisGeminiService } from '@/services/obisGeminiService';
+import { directObisService } from '@/services/directObisApi';
 import { Markdown } from '@/components/ui/markdown';
 
 interface OBISDataset {
@@ -62,7 +62,7 @@ const Datasets: React.FC = () => {
       setLoadingProgress(20);
       setLoadingMessage('Requesting dataset list from OBIS...');
       
-      const result = await obisGeminiService.fetchOBISDatasets(datasetsPerPage, currentPage * datasetsPerPage);
+      const result = await directObisService.getDatasets(datasetsPerPage, currentPage * datasetsPerPage);
       
       setLoadingProgress(60);
       setLoadingMessage('Processing dataset information...');
@@ -73,7 +73,7 @@ const Datasets: React.FC = () => {
       setLoadingProgress(80);
       setLoadingMessage('Organizing results...');
       
-      setDatasets(result.datasets || []);
+      setDatasets(result.results || []);
       setTotalDatasets(result.total || 0);
       
       setLoadingProgress(100);
@@ -98,7 +98,7 @@ const Datasets: React.FC = () => {
     setLoadingProgress(10);
     setLoadingMessage('Loading OBIS statistics...');
     try {
-      const stats = await obisGeminiService.fetchOBISStatistics();
+      const stats = await directObisService.getStatistics();
       setStatistics(stats);
       setLoadingProgress(100);
       setLoadingMessage('Statistics loaded!');

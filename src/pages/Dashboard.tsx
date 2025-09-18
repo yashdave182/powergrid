@@ -13,39 +13,44 @@ const Dashboard = () => {
   const [systemStatus, setSystemStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Check API connection and system status
+  // Check system status using direct OBIS API
   useEffect(() => {
     const checkSystemStatus = async () => {
       try {
         setLoading(true);
         
-        // Check backend health
-        const healthResponse = await healthApi.checkHealth();
+        // Test direct OBIS API connection instead of backend
+        const obisResponse = await fetch('https://api.obis.org/v3/statistics');
         
-        if (healthResponse.error) {
-          toast({
-            title: "Backend Connection",
-            description: "Using demo data - Backend not available",
-            variant: "destructive",
-          });
-        } else {
+        if (obisResponse.ok) {
           toast({
             title: "System Connected",
-            description: "Backend API is running successfully",
+            description: "OBIS API is accessible - Marine data available",
           });
           
-          // Get pipeline status
-          const pipelineResponse = await dataIntegrationApi.getPipelineStatus();
-          if (pipelineResponse.data) {
-            setSystemStatus(pipelineResponse.data);
-          }
+          // Use OBIS statistics as system status
+          const obisStats = await obisResponse.json();
+          setSystemStatus({
+            status: "connected",
+            obis_connection: "active",
+            last_update: new Date().toISOString(),
+            records: obisStats.records || "Available"
+          });
+        } else {
+          throw new Error('OBIS API not accessible');
         }
       } catch (error) {
         console.error('System status check failed:', error);
         toast({
-          title: "Connection Error",
-          description: "Using demo data - Check backend connection",
+          title: "Limited Connection",
+          description: "Using offline mode - Some features may be limited",
           variant: "destructive",
+        });
+        // Set demo status
+        setSystemStatus({
+          status: "offline",
+          obis_connection: "unavailable",
+          last_update: new Date().toISOString()
         });
       } finally {
         setLoading(false);

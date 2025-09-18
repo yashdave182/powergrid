@@ -1,4 +1,4 @@
-// Enhanced OBIS + Gemini API Integration Service
+// Enhanced OBIS + Gemini API Integration Service - Direct OBIS API
 import { geminiApi } from './geminiApi';
 
 interface OBISSpeciesData {
@@ -42,6 +42,7 @@ interface OBISDataset {
     spatial?: string;
     temporal?: string;
   };
+  abstract?: string;
 }
 
 interface EnhancedMarineAnalysis {
@@ -60,7 +61,7 @@ interface EnhancedMarineAnalysis {
 class OBISGeminiService {
   private obisBaseUrl = 'https://api.obis.org/v3';
 
-  // Fetch list of available OBIS datasets
+  // Direct OBIS API - Fetch list of available datasets
   async fetchOBISDatasets(limit: number = 20, offset: number = 0): Promise<{ datasets: OBISDataset[], total: number }> {
     try {
       const response = await fetch(`${this.obisBaseUrl}/dataset?limit=${limit}&offset=${offset}`);
@@ -80,7 +81,7 @@ class OBISGeminiService {
     }
   }
 
-  // Fetch statistics for visualization
+  // Direct OBIS API - Fetch statistics for visualization
   async fetchOBISStatistics(): Promise<any> {
     try {
       const response = await fetch(`${this.obisBaseUrl}/statistics`);
@@ -96,7 +97,7 @@ class OBISGeminiService {
     }
   }
 
-  // Fetch taxonomy data for analysis
+  // Direct OBIS API - Fetch taxonomy data for analysis
   async fetchOBISTaxonomy(scientificName?: string, rank?: string): Promise<any> {
     try {
       const params = new URLSearchParams();

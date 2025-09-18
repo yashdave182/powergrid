@@ -19,25 +19,41 @@ const ApiTest = () => {
   const testHealthAPI = async () => {
     setLoading(true);
     try {
-      const response = await healthApi.checkHealth();
+      // Test direct OBIS API instead of backend
+      const obisResponse = await fetch('https://api.obis.org/v3/statistics');
+      const obisData = await obisResponse.json();
+      
+      const response = {
+        data: {
+          status: obisResponse.ok ? "healthy" : "error",
+          message: obisResponse.ok 
+            ? "OBIS API is accessible - Marine data available" 
+            : "OBIS API connection failed",
+          obis_records: obisData.records || "N/A",
+          response_time: "Direct API call"
+        },
+        error: obisResponse.ok ? undefined : "OBIS API connection failed",
+        status: obisResponse.status
+      };
+      
       setResults(response);
       
       if (response.error) {
         toast({
-          title: "Health Check Failed",
+          title: "OBIS API Test Failed",
           description: response.error,
           variant: "destructive",
         });
       } else {
         toast({
-          title: "Health Check Successful",
-          description: "Backend is running properly",
+          title: "OBIS API Test Successful",
+          description: "Direct marine data access working",
         });
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to connect to backend",
+        description: "Failed to connect to OBIS API",
         variant: "destructive",
       });
     } finally {
@@ -57,12 +73,29 @@ const ApiTest = () => {
 
     setLoading(true);
     try {
-      // Test with real OBIS data
-      const response = await biodiversityApi.searchSpecies({
-        scientific_name: searchTerm,
-        data_source: 'obis', // Test OBIS specifically
-        limit: 10
+      // Direct OBIS API call for species occurrence
+      const params = new URLSearchParams({
+        scientificname: searchTerm,
+        limit: '10'
       });
+      
+      const obisResponse = await fetch(`https://api.obis.org/v3/occurrence?${params}`);
+      const obisData = await obisResponse.json();
+      
+      const response = {
+        data: {
+          results: {
+            obis: {
+              total: obisData.total || 0,
+              results: obisData.results || [],
+              source: "Direct OBIS API v3"
+            }
+          }
+        },
+        error: obisResponse.ok ? undefined : "OBIS species search failed",
+        status: obisResponse.status
+      };
+      
       setResults(response);
       
       if (response.error) {
@@ -74,7 +107,7 @@ const ApiTest = () => {
       } else {
         toast({
           title: "Species Search Successful",
-          description: `Found ${response.data?.results?.obis?.results?.length || 0} OBIS records`,
+          description: `Found ${obisData.total || 0} OBIS records for ${searchTerm}`,
         });
       }
     } catch (error) {
@@ -213,12 +246,12 @@ const ApiTest = () => {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">API Testing</h1>
-          <p className="text-muted-foreground">Test connection to Marine Data Platform backend</p>
+          <p className="text-muted-foreground">Test direct connection to OBIS marine biodiversity database</p>
         </div>
 
         <Tabs defaultValue="health" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
-            <TabsTrigger value="health">Health</TabsTrigger>
+            <TabsTrigger value="health">OBIS API</TabsTrigger>
             <TabsTrigger value="species">Species</TabsTrigger>
             <TabsTrigger value="obis">OBIS API</TabsTrigger>
             <TabsTrigger value="ocean">Ocean Data</TabsTrigger>
@@ -229,16 +262,16 @@ const ApiTest = () => {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <TestTube className="h-5 w-5" />
-                  <span>Backend Health Check</span>
+                  <span>OBIS API Health Check</span>
                 </CardTitle>
                 <CardDescription>
-                  Test if the backend API is running and accessible
+                  Test direct connection to OBIS marine database
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button onClick={testHealthAPI} disabled={loading} className="w-full">
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Test Health API
+                  Test OBIS API Connection
                 </Button>
               </CardContent>
             </Card>
