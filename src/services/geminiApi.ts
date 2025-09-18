@@ -18,22 +18,23 @@ interface GeminiError {
 
 class GeminiApiService {
   private apiKey: string;
-  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  private baseUrl: string = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
   }
 
   async generateContent(prompt: string): Promise<string> {
-    if (!this.apiKey || this.apiKey === 'your-api-key-here') {
+    if (!this.apiKey || this.apiKey === 'your-api-key-here' || this.apiKey === 'your-actual-api-key-here') {
       throw new Error('Please set your Gemini API key in the environment variables');
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
+      const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'X-goog-api-key': this.apiKey,
         },
         body: JSON.stringify({
           contents: [{
