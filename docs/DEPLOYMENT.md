@@ -1,8 +1,8 @@
-# Deployment and DevOps Documentation
+# Deployment Documentation
 
 ## 🚀 Deployment Architecture
 
-The Marine Data Platform uses a modern cloud deployment architecture with separate frontend and backend hosting for optimal performance and scalability.
+The Marine Data Platform uses a simplified cloud deployment architecture with frontend-only hosting for optimal performance and minimal infrastructure requirements.
 
 ```
 Production Architecture:
@@ -10,10 +10,6 @@ Production Architecture:
 │   ├── React TypeScript App
 │   ├── Static Asset CDN
 │   └── Edge Functions
-├── Backend (Render)
-│   ├── FastAPI Python App
-│   ├── Docker Container
-│   └── Auto-scaling
 └── External APIs
     ├── OBIS API (obis.org)
     └── Google Gemini AI
@@ -27,6 +23,7 @@ Production Architecture:
 - **Automatic Deployments**: Git-based CI/CD
 - **Environment Variables**: Secure config management
 - **Zero Configuration**: Works out of the box with Vite
+- **No Backend Required**: Perfect for our simplified architecture
 
 ### Deployment Configuration
 
@@ -62,7 +59,6 @@ npm run build        # Vite build process
 
 #### Environment Variables (Vercel Dashboard)
 ```
-VITE_API_URL=https://your-backend.onrender.com/api/v1
 VITE_GEMINI_API_KEY=your_google_gemini_api_key_here
 ```
 
@@ -73,7 +69,7 @@ VITE_GEMINI_API_KEY=your_google_gemini_api_key_here
    - Root Directory: `.` (project root)
    - Build Command: `npm run build`
    - Output Directory: `dist`
-3. **Set Environment Variables**: Add API URLs and keys
+3. **Set Environment Variables**: Add Gemini API key
 4. **Deploy**: Automatic deployment on git push
 
 ### Custom Domain Setup

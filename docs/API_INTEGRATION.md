@@ -2,7 +2,7 @@
 
 ## 🌊 External API Integrations
 
-The Marine Data Platform integrates with multiple external APIs to provide comprehensive marine biodiversity data and AI-powered analysis.
+The Marine Data Platform integrates directly with external APIs to provide comprehensive marine biodiversity data and AI-powered analysis without requiring a backend server.
 
 ## 🔗 OBIS API Integration
 
@@ -19,9 +19,9 @@ OBIS (Ocean Biodiversity Information System) is the primary data source for mari
 **Purpose**: Retrieve marine dataset metadata
 **Usage in App**:
 ```typescript
-// Frontend: obisGeminiService.ts
-async fetchOBISDatasets(limit: number = 20, offset: number = 0) {
-  const response = await fetch(`${this.obisBaseUrl}/dataset?limit=${limit}&offset=${offset}`);
+// Frontend: directObisApi.ts
+async getDatasets(limit: number = 20, offset: number = 0) {
+  const response = await fetch(`https://api.obis.org/v3/dataset?limit=${limit}&offset=${offset}`);
   return await response.json();
 }
 ```
@@ -47,20 +47,30 @@ async fetchOBISDatasets(limit: number = 20, offset: number = 0) {
 }
 ```
 
-#### 2. Occurrence Endpoint (CRITICAL)
+#### 2. Occurrence Endpoint
 **URL**: `/occurrence`
 **Purpose**: Retrieve actual species occurrence records
 **Usage in App**:
 ```typescript
-// This was the KEY FIX for getting real data instead of just metadata
-async fetchDatasetOccurrences(datasetId: string, limit: number = 50) {
+// directObisApi.ts - Direct API integration
+async getSpeciesOccurrence(scientificName: string, limit: number = 50) {
   const params = new URLSearchParams({
-    datasetid: datasetId,  // Filter by specific dataset
-    limit: limit.toString(),
-    offset: '0'
+    scientificname: scientificName,
+    limit: limit.toString()
   });
   
-  const response = await fetch(`${this.obisBaseUrl}/occurrence?${params}`);
+  const response = await fetch(`https://api.obis.org/v3/occurrence?${params}`);
+  return await response.json();
+}
+
+// Get dataset-specific occurrences
+async getDatasetOccurrences(datasetId: string, limit: number = 50) {
+  const params = new URLSearchParams({
+    datasetid: datasetId,
+    limit: limit.toString()
+  });
+  
+  const response = await fetch(`https://api.obis.org/v3/occurrence?${params}`);
   return await response.json();
 }
 ```
@@ -96,15 +106,15 @@ async fetchDatasetOccurrences(datasetId: string, limit: number = 50) {
 }
 ```
 
-#### 3. Taxon Endpoint
-**URL**: `/taxon`
-**Purpose**: Retrieve taxonomic information
-**Usage**: Species classification and taxonomy validation
-
-#### 4. Statistics Endpoint
+#### 3. Statistics Endpoint
 **URL**: `/statistics`
 **Purpose**: Get OBIS database statistics
 **Usage**: Dashboard overview and system metrics
+
+#### 4. Taxon Endpoint
+**URL**: `/taxon`
+**Purpose**: Retrieve taxonomic information
+**Usage**: Species classification and taxonomy validation
 
 ### OBIS API Parameters
 
@@ -145,22 +155,6 @@ class GeminiApiService {
     return result.response.text();
   }
 }
-```
-
-#### Backend Integration
-```python
-# services/ai_service.py
-import google.generativeai as genai
-
-class AIService:
-    def __init__(self):
-        genai.configure(api_key=settings.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-exp')
-    
-    async def analyze_marine_data(self, data: Dict[str, Any]) -> str:
-        prompt = self.construct_analysis_prompt(data)
-        response = await self.model.generate_content_async(prompt)
-        return response.text
 ```
 
 ### AI Analysis Workflow

@@ -24,6 +24,8 @@ This guide will help new developers set up the Marine Data Platform development 
    - Get from: https://makersuite.google.com/app/apikey
    - Required for AI analysis features
 
+*Note: No backend setup required - the application connects directly to OBIS API*
+
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
@@ -32,7 +34,7 @@ git clone https://github.com/your-username/marine-data-platform.git
 cd marine-data-platform
 ```
 
-### 2. Frontend Setup
+### 2. Install Dependencies and Setup
 ```bash
 # Install frontend dependencies
 npm install
@@ -40,47 +42,19 @@ npm install
 # Create environment file
 cp .env.example .env.local
 
-# Edit .env.local with your API keys
-VITE_API_URL=http://localhost:8000/api/v1
+# Edit .env.local with your API key
 VITE_GEMINI_API_KEY=your_google_gemini_api_key_here
 
 # Start development server
 npm run dev
 ```
 
-### 3. Backend Setup
-```bash
-# Navigate to backend directory
-cd backend
-
-# Create virtual environment (recommended)
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create environment file
-cp .env.example .env
-
-# Edit .env with your settings
-DEBUG=true
-GEMINI_API_KEY=your_google_gemini_api_key_here
-ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
-
-# Start development server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 4. Verify Setup
+### 3. Verify Setup
 1. **Frontend**: Open http://localhost:5173 (or port shown in terminal)
-2. **Backend**: Open http://localhost:8000/docs for API documentation
-3. **Health Check**: Both should load without errors
+2. **OBIS API**: Test connection via the API Test page
+3. **AI Integration**: Verify Gemini API key is working
+
+*No backend setup required - the application works entirely with external APIs*
 
 ## 🏗️ Development Workflow
 
@@ -92,14 +66,7 @@ marine-data-platform/
 │   ├── 📁 pages/             # Main application pages
 │   ├── 📁 services/          # API integration logic
 │   ├── 📁 hooks/             # Custom React hooks
-│   ├── 📁 lib/               # Utility functions
-│   └── 📁 types/             # TypeScript definitions
-├── 📁 backend/               # Python FastAPI server
-│   ├── 📁 app/               # Main application code
-│   │   ├── 📁 api/           # API route definitions
-│   │   ├── 📁 services/      # Business logic
-│   │   └── 📁 core/          # Core configuration
-│   └── 📄 requirements.txt   # Python dependencies
+│   └── 📁 lib/               # Utility functions
 ├── 📁 docs/                  # Documentation files
 ├── 📄 package.json           # Frontend dependencies
 └── 📄 README.md             # Project overview
@@ -120,22 +87,6 @@ npm run preview
 
 # Lint code
 npm run lint
-```
-
-#### Backend Commands
-```bash
-# Development server with auto-reload
-uvicorn app.main:app --reload
-
-# Run tests
-python -m pytest
-
-# Run specific test
-python -m pytest tests/test_ai.py
-
-# Check code style
-black app/ --check
-flake8 app/
 ```
 
 ### 3. Key Development Files

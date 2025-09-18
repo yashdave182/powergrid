@@ -2,7 +2,7 @@
 
 ## 📚 Complete Documentation Suite
 
-Welcome to the comprehensive documentation for the Marine Data Platform. This documentation is designed to help developers at all levels understand, contribute to, and deploy this marine biodiversity analysis platform.
+Welcome to the comprehensive documentation for the Marine Data Platform. This documentation helps developers understand, contribute to, and deploy this marine biodiversity analysis platform with direct API integration.
 
 ## 🎯 Documentation Overview
 
@@ -12,28 +12,21 @@ Welcome to the comprehensive documentation for the Marine Data Platform. This do
 1. **[Main README](../README.md)** - Project overview and quick start
 2. **[Development Guide](DEVELOPMENT.md)** - Complete setup and development workflow
 3. **[Frontend Architecture](FRONTEND.md)** - React/TypeScript frontend deep dive
-4. **[Backend Architecture](BACKEND.md)** - FastAPI Python backend guide
 
 ### For Advanced Users
 **Detailed technical documentation**
 
-5. **[API Integration](API_INTEGRATION.md)** - External API integrations (OBIS, Gemini)
-6. **[Deployment Guide](DEPLOYMENT.md)** - Production deployment (Vercel + Render)
+4. **[API Integration](API_INTEGRATION.md)** - OBIS and Gemini API integrations
+5. **[Deployment Guide](DEPLOYMENT.md)** - Production deployment (Vercel)
 
-## 🔥 Critical Issue Fixed
+## 🔥 Simplified Architecture
 
-### AI Analysis Now Uses Real Data
-**Problem**: AI analysis was showing "no actual data" despite datasets having millions of records.
-
-**Solution**: The `obisGeminiService.ts` was completely refactored to fetch both dataset metadata AND actual occurrence records.
-
-**Key Changes**:
-- Added `fetchDatasetOccurrences()` method
-- Modified `analyzeDatasetWithAI()` to use real species data
-- Enhanced AI prompts for meaningful analysis
-- Fixed data flow from OBIS API to Gemini AI
-
-**Impact**: AI now provides scientifically accurate analysis based on real marine species occurrence data.
+### Frontend-Only Design
+The Marine Data Platform now uses a simplified architecture:
+- **No Backend Required**: Direct API integration
+- **OBIS API**: Direct marine data access
+- **Gemini AI**: Integrated AI analysis
+- **Vercel Deployment**: Simple static hosting
 
 ## 📖 How to Use This Documentation
 
@@ -78,18 +71,14 @@ Marine Data Platform
 │   ├── Pages: Dashboard, Analytics, Datasets, Visualizations
 │   ├── Services: OBIS + Gemini integration
 │   └── Components: ShadCN UI library
-├── Backend (FastAPI + Python)
-│   ├── APIs: Biodiversity, Analytics, AI endpoints
-│   ├── Services: External API integration
-│   └── Core: Configuration and database
 └── External Integrations
     ├── OBIS API: Marine biodiversity data
     └── Gemini AI: Analysis and insights
 ```
 
-### Key Data Flow (Fixed)
+### Key Data Flow
 ```
-User Action → Frontend → Service Layer → OBIS API → Real Data + Metadata → Gemini AI → Analysis → UI Display
+User Action → Frontend → Direct OBIS API → Real Data → Gemini AI → Analysis → UI Display
 ```
 
 ## 🔧 Quick Setup Commands
@@ -98,15 +87,8 @@ User Action → Frontend → Service Layer → OBIS API → Real Data + Metadata
 ```bash
 npm install
 cp .env.example .env.local
+# Add VITE_GEMINI_API_KEY to .env.local
 npm run dev
-```
-
-### Backend
-```bash
-cd backend
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn app.main:app --reload
 ```
 
 ## 🚀 Deployment Commands
@@ -114,16 +96,8 @@ uvicorn app.main:app --reload
 ### Vercel (Frontend)
 ```bash
 # Connect GitHub repo to Vercel dashboard
-# Set environment variables
+# Set environment variable: VITE_GEMINI_API_KEY
 # Auto-deploy on git push
-```
-
-### Render (Backend)
-```bash
-# Connect GitHub repo to Render dashboard
-# Configure build: pip install -r requirements.txt
-# Configure start: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-# Set environment variables
 ```
 
 ## 📊 Documentation Quality Standards
