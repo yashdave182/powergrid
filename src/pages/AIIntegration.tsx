@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { geminiApi } from '@/services/geminiApi';
 import { obisGeminiService } from '@/services/obisGeminiService';
+import { Markdown } from '@/components/ui/markdown';
 
 interface AIResponse {
   status: string;
@@ -202,7 +202,7 @@ const AIIntegration: React.FC = () => {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Your Question:</label>
                 <Textarea
-                  placeholder="e.g., What are the main threats to coral reef ecosystems?"
+                  placeholder="e.g., What are the main threats to coral reef ecosystems? How does ocean acidification affect marine biodiversity?"
                   value={chatQuestion}
                   onChange={(e) => setChatQuestion(e.target.value)}
                   rows={3}
@@ -219,7 +219,7 @@ const AIIntegration: React.FC = () => {
                     {chatResponse.status === 'success' ? (
                       <div className="space-y-3">
                         <Badge variant="secondary">AI Response</Badge>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{chatResponse.content}</p>
+                        <Markdown content={chatResponse.content} className="text-sm" />
                       </div>
                     ) : (
                       <div className="text-red-600">
@@ -268,7 +268,7 @@ const AIIntegration: React.FC = () => {
                         <div className="space-y-3">
                           <div>
                             <h4 className="font-medium mb-2">Analysis:</h4>
-                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{analysisResponse.content}</p>
+                            <Markdown content={analysisResponse.content} className="text-sm" />
                           </div>
                         </div>
                       </div>
@@ -307,7 +307,7 @@ const AIIntegration: React.FC = () => {
                     {quickInsights.status === 'success' ? (
                       <div className="space-y-4">
                         <Badge variant="secondary">AI Insights</Badge>
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{quickInsights.content}</p>
+                        <Markdown content={quickInsights.content} className="text-sm" />
                       </div>
                     ) : (
                       <div className="text-red-600">
@@ -366,7 +366,7 @@ const AIIntegration: React.FC = () => {
                         
                         <div>
                           <h4 className="font-medium mb-2">AI Analysis:</h4>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{speciesAnalysis.ai_analysis}</p>
+                          <Markdown content={speciesAnalysis.ai_analysis} className="text-sm" />
                         </div>
                         
                         <div>
@@ -427,7 +427,7 @@ const AIIntegration: React.FC = () => {
                         
                         <div>
                           <h4 className="font-medium mb-2">AI Analysis:</h4>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{datasetAnalysis.ai_analysis}</p>
+                          <Markdown content={datasetAnalysis.ai_analysis} className="text-sm" />
                         </div>
                         
                         <div>
@@ -485,7 +485,7 @@ const AIIntegration: React.FC = () => {
                         
                         <div>
                           <h4 className="font-medium mb-2">AI Analysis:</h4>
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{regionAnalysis.content?.ai_analysis}</p>
+                          <Markdown content={regionAnalysis.content?.ai_analysis} className="text-sm" />
                         </div>
                         
                         <div>
