@@ -1,6 +1,5 @@
 // API Configuration and Base Service
-// Use environment variable for deployment, fallback to localhost for development
-const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/,'');
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'https://sih-1zth.onrender.com/api/v1').replace(/\/+$/,'');
 
 export interface ApiResponse<T> {
   data?: T;
