@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Brain, TrendingUp, Database, Search, BarChart3, Clock } from "lucide-react";
@@ -11,6 +12,8 @@ import { Markdown } from '@/components/ui/markdown';
 
 const Analytics = () => {
   const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [selectedSpecies, setSelectedSpecies] = useState('');
   const [selectedRegion, setSelectedRegion] = useState('');
   const [obisData, setObisData] = useState<any>(null);
@@ -37,15 +40,40 @@ const Analytics = () => {
     }
 
     setAnalysisRunning(true);
+    setLoadingProgress(0);
+    setLoadingMessage('Initializing species search...');
+    
     try {
+      setLoadingProgress(15);
+      setLoadingMessage('Searching OBIS database for species data...');
+      
       const analysis = await obisGeminiService.searchSpeciesWithAI(selectedSpecies, undefined, 100);
+      
+      setLoadingProgress(50);
+      setLoadingMessage('Processing species occurrence data...');
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setLoadingProgress(75);
+      setLoadingMessage('Generating AI insights...');
+      
       setAnalysisResults(analysis);
       setObisData(analysis.obis_data);
+      
+      setLoadingProgress(100);
+      setLoadingMessage('Analysis complete!');
+      
       toast.success('Species analysis completed successfully');
     } catch (error: any) {
+      setLoadingProgress(0);
+      setLoadingMessage('Analysis failed');
       toast.error(error.message || 'Failed to analyze species');
     } finally {
-      setAnalysisRunning(false);
+      setTimeout(() => {
+        setAnalysisRunning(false);
+        setLoadingProgress(0);
+        setLoadingMessage('');
+      }, 1000);
     }
   };
 
@@ -56,14 +84,35 @@ const Analytics = () => {
     }
 
     setAnalysisRunning(true);
+    setLoadingProgress(0);
+    setLoadingMessage('Preparing regional analysis...');
+    
     try {
+      setLoadingProgress(20);
+      setLoadingMessage('Searching OBIS data for region...');
+      
       const analysis = await obisGeminiService.getMarineInsightsForRegion(selectedRegion, 'Selected Region');
+      
+      setLoadingProgress(70);
+      setLoadingMessage('Analyzing regional biodiversity patterns...');
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       setAnalysisResults({ ai_analysis: analysis });
+      setLoadingProgress(100);
+      setLoadingMessage('Regional analysis complete!');
+      
       toast.success('Regional analysis completed successfully');
     } catch (error: any) {
+      setLoadingProgress(0);
+      setLoadingMessage('Analysis failed');
       toast.error(error.message || 'Failed to analyze region');
     } finally {
-      setAnalysisRunning(false);
+      setTimeout(() => {
+        setAnalysisRunning(false);
+        setLoadingProgress(0);
+        setLoadingMessage('');
+      }, 1000);
     }
   };
 
@@ -115,7 +164,7 @@ const Analytics = () => {
                       {analysisRunning ? (
                         <>
                           <Clock className="h-4 w-4 mr-2 animate-spin" />
-                          Analyzing...
+                          Analyzing... {loadingProgress}%
                         </>
                       ) : (
                         <>
@@ -126,6 +175,20 @@ const Analytics = () => {
                     </Button>
                   </div>
                 </div>
+                
+                {/* Progress Indicator for Species Analysis */}
+                {analysisRunning && (
+                  <div className="space-y-3 mt-4 p-4 bg-blue-50 rounded-lg">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-blue-900">{loadingMessage}</span>
+                      <span className="text-blue-700">{loadingProgress}%</span>
+                    </div>
+                    <Progress value={loadingProgress} className="w-full" />
+                    <div className="text-xs text-blue-600 text-center">
+                      Processing real OBIS species occurrence data...
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -265,7 +328,7 @@ const Analytics = () => {
                       {analysisRunning ? (
                         <>
                           <Clock className="h-4 w-4 mr-2 animate-spin" />
-                          Analyzing...
+                          Analyzing... {loadingProgress}%
                         </>
                       ) : (
                         <>
@@ -276,6 +339,20 @@ const Analytics = () => {
                     </Button>
                   </div>
                 </div>
+                
+                {/* Progress Indicator for Regional Analysis */}
+                {analysisRunning && (
+                  <div className="space-y-3 mt-4 p-4 bg-green-50 rounded-lg">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium text-green-900">{loadingMessage}</span>
+                      <span className="text-green-700">{loadingProgress}%</span>
+                    </div>
+                    <Progress value={loadingProgress} className="w-full" />
+                    <div className="text-xs text-green-600 text-center">
+                      Analyzing regional marine biodiversity patterns...
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

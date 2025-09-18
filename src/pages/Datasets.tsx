@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Database, 
@@ -34,6 +36,8 @@ interface OBISDataset {
 
 const Datasets: React.FC = () => {
   const [loading, setLoading] = useState(false);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [datasets, setDatasets] = useState<OBISDataset[]>([]);
   const [totalDatasets, setTotalDatasets] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
@@ -50,40 +54,93 @@ const Datasets: React.FC = () => {
 
   const loadDatasets = async () => {
     setLoading(true);
+    setLoadingProgress(0);
+    setLoadingMessage('Connecting to OBIS API...');
+    
     try {
-      const result = await obisDataService.fetchOBISDatasets(datasetsPerPage, currentPage * datasetsPerPage);
-      setDatasets(result.results || []);
+      // Simulate progress updates
+      setLoadingProgress(20);
+      setLoadingMessage('Requesting dataset list from OBIS...');
+      
+      const result = await obisGeminiService.fetchOBISDatasets(datasetsPerPage, currentPage * datasetsPerPage);
+      
+      setLoadingProgress(60);
+      setLoadingMessage('Processing dataset information...');
+      
+      // Add a small delay to show progress
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setLoadingProgress(80);
+      setLoadingMessage('Organizing results...');
+      
+      setDatasets(result.datasets || []);
       setTotalDatasets(result.total || 0);
-      toast.success(`Loaded ${result.results?.length || 0} OBIS datasets`);
+      
+      setLoadingProgress(100);
+      setLoadingMessage('Complete!');
+      
+      toast.success(`Loaded ${result.datasets?.length || 0} OBIS datasets`);
     } catch (error: any) {
+      setLoadingProgress(0);
+      setLoadingMessage('Failed to load datasets');
       toast.error(error.message || 'Failed to load datasets');
       console.error('Error loading datasets:', error);
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setLoadingProgress(0);
+        setLoadingMessage('');
+      }, 1000);
     }
   };
 
   const loadStatistics = async () => {
+    setLoadingProgress(10);
+    setLoadingMessage('Loading OBIS statistics...');
     try {
-      const stats = await obisDataService.getOBISStats();
+      const stats = await obisGeminiService.fetchOBISStatistics();
       setStatistics(stats);
+      setLoadingProgress(100);
+      setLoadingMessage('Statistics loaded!');
     } catch (error: any) {
       console.error('Error loading statistics:', error);
+      setLoadingMessage('Statistics unavailable');
     }
   };
 
   const analyzeDataset = async (dataset: OBISDataset) => {
     setSelectedDataset(dataset);
     setLoading(true);
+    setLoadingProgress(0);
+    setLoadingMessage('Preparing dataset analysis...');
+    
     try {
+      setLoadingProgress(25);
+      setLoadingMessage('Sending dataset to AI for analysis...');
+      
       const analysis = await obisGeminiService.analyzeDatasetWithAI(dataset.id);
+      
+      setLoadingProgress(75);
+      setLoadingMessage('Processing AI insights...');
+      
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       setDatasetAnalysis(analysis);
+      setLoadingProgress(100);
+      setLoadingMessage('Analysis complete!');
+      
       toast.success('Dataset analysis completed');
     } catch (error: any) {
+      setLoadingProgress(0);
+      setLoadingMessage('Analysis failed');
       toast.error(error.message || 'Failed to analyze dataset');
       setDatasetAnalysis({ error: error.message || 'Unknown error' });
     } finally {
-      setLoading(false);
+      setTimeout(() => {
+        setLoading(false);
+        setLoadingProgress(0);
+        setLoadingMessage('');
+      }, 1000);
     }
   };
 
@@ -145,10 +202,21 @@ const Datasets: React.FC = () => {
               </div>
 
               {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin mr-3" />
-                  <span>Loading OBIS datasets...</span>
-                </div>
+                <Card className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin mr-3 text-blue-600" />
+                      <div className="text-center">
+                        <div className="font-medium">{loadingMessage}</div>
+                        <div className="text-sm text-gray-500">{loadingProgress}% complete</div>
+                      </div>
+                    </div>
+                    <Progress value={loadingProgress} className="w-full" />
+                    <div className="text-xs text-center text-gray-400">
+                      Fetching real-time data from OBIS Marine Database...
+                    </div>
+                  </div>
+                </Card>
               ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                   {filteredDatasets.map((dataset) => (
