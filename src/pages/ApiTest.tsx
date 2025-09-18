@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
-import { biodiversityApi, oceanographyApi, healthApi } from "@/services/marineApi";
+import { directObisService } from "@/services/directObisApi";
 import { Loader2, Search, TestTube, Waves, Fish } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 

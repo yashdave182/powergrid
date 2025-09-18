@@ -2,7 +2,7 @@
 
 ## 🎯 Frontend Overview
 
-The frontend is a React TypeScript application built with Vite, providing a modern, responsive interface for marine data visualization and AI-powered analysis.
+The frontend is a React TypeScript application built with Vite, providing a modern, responsive interface for marine data visualization and AI-powered analysis. The application connects directly to external APIs without requiring a backend server.
 
 ## 📂 Frontend Directory Structure
 
@@ -15,7 +15,6 @@ src/
 ├── services/          # API integration and business logic
 ├── hooks/            # Custom React hooks
 ├── lib/              # Utility functions and configurations
-├── types/            # TypeScript type definitions
 ├── App.tsx           # Main application component
 ├── main.tsx          # Application entry point
 └── index.css         # Global styles
@@ -42,19 +41,19 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 ### Dashboard.tsx
 **Purpose**: Main landing page with system overview and quick stats
 **Key Features**:
-- System health monitoring
+- OBIS API connection monitoring
 - Quick navigation to other sections
 - Real-time status indicators
-- Pipeline status from backend
+- Marine data statistics
 
 **Data Sources**:
-- Backend health API
-- Pipeline status API
-- Demo data fallback
+- `directObisService.testConnection()` - OBIS API health check
+- `directObisService.getStatistics()` - Marine data statistics
+- Demo data fallback for offline mode
 
 **Code Flow**:
 1. Component mounts → useEffect triggers
-2. Calls `healthApi.checkHealth()` and `dataIntegrationApi.getPipelineStatus()`
+2. Calls `directObisService.testConnection()` to verify OBIS API
 3. Updates state with system status
 4. Renders cards with navigation links
 
@@ -67,8 +66,8 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 - Dataset details and metadata
 
 **Data Sources**:
-- `obisGeminiService.fetchOBISDatasets()`
-- OBIS API v3 dataset endpoints
+- `directObisService.getDatasets()` - Direct OBIS dataset API
+- `obisGeminiService.fetchOBISDatasets()` - Enhanced dataset fetching
 
 **Code Flow**:
 1. Component mounts → loads initial datasets
@@ -104,8 +103,8 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 - Interactive filtering
 
 **Data Sources**:
-- `obisDataService.getSpeciesOccurrenceData()`
-- `obisDataService.getTaxaData()`
+- `directObisService.getSpeciesOccurrence()` - Direct species data
+- `directObisService.getTaxon()` - Taxonomic information
 - Real-time OBIS data
 
 **Code Flow**:
@@ -127,12 +126,16 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 - `obisGeminiService.quickSpeciesLookup()`
 
 ### ApiTest.tsx
-**Purpose**: Development tool for testing API connections
+**Purpose**: Development tool for testing OBIS API connections
 **Key Features**:
-- Backend health checks
-- API endpoint testing
+- OBIS API health checks
+- Species search testing
 - Response debugging
 - Connection diagnostics
+
+**Data Sources**:
+- `directObisService.testConnection()` - OBIS API health
+- `directObisService.getSpeciesOccurrence()` - Species search testing
 
 ### Tools.tsx
 **Purpose**: Additional utilities and tools
@@ -143,20 +146,43 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 
 ## 🔧 Service Layer Architecture
 
+### directObisApi.ts
+**Purpose**: Direct integration with OBIS API v3
+
+**Key Methods**:
+
+#### `getDatasets(limit, offset)`
+- Fetches paginated list of OBIS datasets directly
+- Returns metadata: title, description, record counts
+- Used by Datasets page for browsing
+
+#### `getSpeciesOccurrence(scientificName, limit)`
+- Searches for species in OBIS database directly
+- Returns occurrence records with coordinates and dates
+- Used for species analysis
+
+#### `getDatasetOccurrences(datasetId, limit)`
+- Fetches actual species occurrence records from specific dataset
+- Returns real species data instead of just metadata
+- Enables meaningful AI analysis
+
+#### `getStatistics()`
+- Fetches OBIS database statistics
+- Used for dashboard overview
+
+#### `testConnection()`
+- Tests OBIS API connectivity
+- Returns connection status and response time
+
 ### obisGeminiService.ts
 **Purpose**: Core integration between OBIS API and Google Gemini AI
 
 **Key Methods**:
 
-#### `fetchOBISDatasets(limit, offset)`
-- Fetches paginated list of OBIS datasets
-- Returns metadata: title, description, record counts
-- Used by Datasets page for browsing
-
 #### `analyzeDatasetWithAI(datasetId)`
-**This is the CORE method that was fixed for real data analysis**
-- Fetches dataset metadata: `fetchOBISDataset(datasetId)`
-- **CRITICAL**: Fetches actual occurrence records: `fetchDatasetOccurrences(datasetId)`
+**This is the CORE method for AI analysis**
+- Fetches dataset metadata via `directObisService`
+- Fetches actual occurrence records via `directObisService`
 - Combines both for comprehensive AI analysis
 - Returns detailed insights with real species data
 
@@ -164,36 +190,6 @@ User Interaction → Page Component → Service Layer → External APIs → Stat
 - Searches for species in OBIS database
 - Analyzes results with AI
 - Returns enhanced analysis with insights
-
-#### `fetchDatasetOccurrences(datasetId, limit)`
-**Key Fix**: This method fetches actual species occurrence records
-- Uses OBIS occurrence API with dataset filter
-- Returns real species data instead of just metadata
-- Enables meaningful AI analysis
-
-**Previous Issue**: AI was getting only metadata (title, record count)
-**Fix Applied**: Now gets actual occurrence records with species names, coordinates, dates
-
-### marineApi.ts
-**Purpose**: Comprehensive API service for marine data operations
-
-**API Categories**:
-
-#### Biodiversity APIs
-- `searchSpecies()` - Search across OBIS and GBIF
-- `getSpeciesDetails()` - Detailed species information
-- `analyzeEdna()` - eDNA sequence analysis
-- `getDatasets()` - Dataset management
-
-#### Oceanography APIs
-- `getTemperatureProfiles()` - Ocean temperature data
-- `getSalinityData()` - Salinity measurements
-- `getNutrientData()` - Chemical composition
-- `getCurrentAnalysis()` - Ocean current data
-
-#### Analytics APIs
-- `analyzeEcosystemHealth()` - Ecosystem assessment
-- `predictSpeciesDistribution()` - Predictive modeling
 
 ### geminiApi.ts
 **Purpose**: Google Gemini AI integration service

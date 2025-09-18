@@ -5,7 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { ArrowUpRight, Database, Map, BarChart3, Fish, Waves, Thermometer, TreePine } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
-import { healthApi, dataIntegrationApi, biodiversityApi } from "@/services/marineApi";
+import { directObisService } from "@/services/directObisApi";
 import { useToast } from "@/hooks/use-toast";
 
 const Dashboard = () => {

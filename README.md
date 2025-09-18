@@ -9,18 +9,13 @@ The Marine Data Platform is a comprehensive web application that integrates real
 ```
 Marine Data Platform
 ├── Frontend (React + TypeScript + Vite)
-│   ├── Real-time OBIS API integration
+│   ├── Direct OBIS API v3 integration
 │   ├── Google Gemini AI analysis
 │   ├── Interactive charts and visualizations
 │   └── Responsive UI with ShadCN components
-├── Backend (FastAPI + Python)
-│   ├── API endpoints for marine data
-│   ├── OBIS API integration
-│   ├── AI service integration
-│   └── Data processing and validation
-└── Deployment
-    ├── Frontend: Vercel
-    └── Backend: Render
+└── External APIs
+    ├── OBIS API v3 - Marine biodiversity data
+    └── Google Gemini API - AI analysis and insights
 ```
 
 ## 🚀 Technology Stack
@@ -35,16 +30,8 @@ Marine Data Platform
 - **Recharts** - Data visualization
 - **React Leaflet** - Map components
 
-### Backend
-- **FastAPI** - Python web framework
-- **Uvicorn** - ASGI server
-- **Pydantic** - Data validation
-- **HTTPx** - HTTP client for external APIs
-- **Google Gemini** - AI analysis
-- **SQLAlchemy** - Database ORM (optional)
-
 ### External APIs
-- **OBIS API v3** - Marine biodiversity data
+- **OBIS API v3** - Marine biodiversity data (https://api.obis.org/v3)
 - **Google Gemini API** - AI analysis and insights
 
 ## 📁 Project Structure Deep Dive
@@ -53,16 +40,14 @@ Marine Data Platform
 ```
 SIH/
 ├── src/                    # Frontend source code
-├── backend/               # Backend API server
-├── docs/                 # Comprehensive documentation
-├── public/               # Static assets
-├── package.json         # Frontend dependencies
-├── vite.config.ts      # Vite configuration
-├── tailwind.config.ts  # TailwindCSS configuration
-├── tsconfig.json       # TypeScript configuration
-├── vercel.json         # Vercel deployment config
-├── DEPLOYMENT.md       # Deployment instructions
-└── README.md          # This documentation
+├── docs/                   # Comprehensive documentation
+├── public/                 # Static assets
+├── package.json           # Frontend dependencies
+├── vite.config.ts         # Vite configuration
+├── tailwind.config.ts     # TailwindCSS configuration
+├── tsconfig.json          # TypeScript configuration
+├── vercel.json            # Vercel deployment config
+└── README.md              # This documentation
 ```
 
 ## 📚 Comprehensive Documentation
@@ -144,16 +129,16 @@ This project includes detailed documentation for developers at all levels:
 
 ### 1. Data Flow Architecture
 ```
-User Interaction → Frontend Component → Service Layer → External APIs → AI Analysis → Results Display
+User Interaction → Frontend Component → Direct OBIS API → AI Analysis → Results Display
 ```
 
-### 2. Core Data Flow (FIXED)
+### 2. Core Data Flow
 ```
 User selects dataset →
 Analytics.tsx →
 obisGeminiService.analyzeDatasetWithAI() →
-  ├── fetchOBISDataset(id) → OBIS metadata
-  ├── fetchDatasetOccurrences(id) → OBIS occurrence records (FIX)
+  ├── directObisService.getDatasets() → OBIS metadata
+  ├── directObisService.getDatasetOccurrences() → OBIS occurrence records
   └── analyzeDatasetWithOccurrences() → Gemini AI analysis
 Markdown rendering → User sees comprehensive results
 ```
@@ -167,38 +152,35 @@ Markdown rendering → User sees comprehensive results
    cd marine-data-platform
    ```
 
-2. **Frontend Setup**
+2. **Install Dependencies**
    ```bash
    npm install
+   ```
+
+3. **Set Environment Variables**
+   ```bash
    cp .env.example .env.local
-   # Edit .env.local with your API keys
+   # Edit .env.local with your Gemini API key
+   VITE_GEMINI_API_KEY=your_google_gemini_api_key
+   ```
+
+4. **Start Development Server**
+   ```bash
    npm run dev
    ```
 
-3. **Backend Setup**
-   ```bash
-   cd backend
-   pip install -r requirements.txt
-   cp .env.example .env
-   # Edit .env with your settings
-   uvicorn app.main:app --reload
-   ```
-
 ### For Deployment
-See [DEPLOYMENT.md](DEPLOYMENT.md) for complete deployment instructions to Vercel + Render.
+See [DEPLOYMENT.md](docs/DEPLOYMENT.md) for Vercel deployment instructions.
 
 ## 🔧 Environment Configuration
 
 ### Required Environment Variables
 ```env
-# Frontend
-VITE_API_URL=https://your-backend.onrender.com/api/v1
+# Google Gemini API Key (required for AI analysis)
 VITE_GEMINI_API_KEY=your_google_gemini_api_key
 
-# Backend
-DEBUG=false
-GEMINI_API_KEY=your_google_gemini_api_key
-ALLOWED_ORIGINS=https://your-frontend.vercel.app
+# Optional: Enable debug mode
+VITE_DEBUG=false
 ```
 
 ## 🐛 Key Issue Fixed
