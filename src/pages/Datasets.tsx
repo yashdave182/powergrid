@@ -1,318 +1,356 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Upload, Search, Filter, FileText, Image, Database, Calendar, MapPin, Tag } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Database, 
+  Search, 
+  Loader2, 
+  FileText,
+  BarChart3,
+  ExternalLink,
+  Activity
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { obisGeminiService, obisDataService } from '@/services/obisGeminiService';
+import { Markdown } from '@/components/ui/markdown';
 
-const Datasets = () => {
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const { toast } = useToast();
+interface OBISDataset {
+  id: string;
+  title: string;
+  description?: string;
+  abstract?: string;
+  citation?: string;
+  license?: string;
+  records?: number;
+  url?: string;
+  extent?: {
+    spatial?: string;
+    temporal?: string;
+  };
+}
 
-  const datasets = [
-    {
-      id: 1,
-      name: "Arabian Sea Temperature Survey 2024",
-      type: "CSV",
-      size: "2.3 MB",
-      species: "Mixed Pelagic",
-      location: "Arabian Sea",
-      date: "2024-01-15",
-      parameters: ["Temperature", "Salinity", "pH"],
-      status: "validated",
-      records: 1250
-    },
-    {
-      id: 2,
-      name: "Coastal Fish Diversity Kerala",
-      type: "JSON",
-      size: "5.7 MB",
-      species: "Coastal Fish",
-      location: "Kerala Coast",
-      date: "2024-02-20",
-      parameters: ["Species Count", "Biomass", "Length"],
-      status: "processing",
-      records: 890
-    },
-    {
-      id: 3,
-      name: "Otolith Images Collection",
-      type: "Images",
-      size: "125 MB",
-      species: "Various",
-      location: "Multiple",
-      date: "2024-03-10",
-      parameters: ["Images", "Morphometry"],
-      status: "validated",
-      records: 340
-    },
-    {
-      id: 4,
-      name: "Monsoon Impact Study",
-      type: "CSV",
-      size: "8.2 MB",
-      species: "Plankton",
-      location: "Bay of Bengal",
-      date: "2024-02-05",
-      parameters: ["Abundance", "Diversity", "Environmental"],
-      status: "validated",
-      records: 2100
-    }
-  ];
+const Datasets: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [datasets, setDatasets] = useState<OBISDataset[]>([]);
+  const [totalDatasets, setTotalDatasets] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedDataset, setSelectedDataset] = useState<OBISDataset | null>(null);
+  const [datasetAnalysis, setDatasetAnalysis] = useState<any>(null);
+  const [statistics, setStatistics] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(0);
+  const datasetsPerPage = 10;
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files && files.length > 0) {
-      toast({
-        title: "Files uploaded successfully",
-        description: `${files.length} file(s) have been processed and added to the queue.`,
-      });
-      setUploadDialogOpen(false);
+  useEffect(() => {
+    loadDatasets();
+    loadStatistics();
+  }, [currentPage]);
+
+  const loadDatasets = async () => {
+    setLoading(true);
+    try {
+      const result = await obisDataService.fetchOBISDatasets(datasetsPerPage, currentPage * datasetsPerPage);
+      setDatasets(result.results || []);
+      setTotalDatasets(result.total || 0);
+      toast.success(`Loaded ${result.results?.length || 0} OBIS datasets`);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to load datasets');
+      console.error('Error loading datasets:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "validated": return "bg-emerald-100 text-emerald-800 border-emerald-200";
-      case "processing": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "error": return "bg-red-100 text-red-800 border-red-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+  const loadStatistics = async () => {
+    try {
+      const stats = await obisDataService.getOBISStats();
+      setStatistics(stats);
+    } catch (error: any) {
+      console.error('Error loading statistics:', error);
     }
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "CSV": return <FileText className="h-4 w-4" />;
-      case "JSON": return <Database className="h-4 w-4" />;
-      case "Images": return <Image className="h-4 w-4" />;
-      default: return <FileText className="h-4 w-4" />;
+  const analyzeDataset = async (dataset: OBISDataset) => {
+    setSelectedDataset(dataset);
+    setLoading(true);
+    try {
+      const analysis = await obisGeminiService.analyzeDatasetWithAI(dataset.id);
+      setDatasetAnalysis(analysis);
+      toast.success('Dataset analysis completed');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to analyze dataset');
+      setDatasetAnalysis({ error: error.message || 'Unknown error' });
+    } finally {
+      setLoading(false);
     }
   };
 
   const filteredDatasets = datasets.filter(dataset =>
-    dataset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dataset.species.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dataset.location.toLowerCase().includes(searchTerm.toLowerCase())
+    dataset.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    dataset.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    dataset.abstract?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const totalPages = Math.ceil(totalDatasets / datasetsPerPage);
+
   return (
-    <div className="min-h-screen bg-gradient-depth p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Dataset Management</h1>
-          <p className="text-muted-foreground">Upload, organize, and manage your marine research datasets</p>
-        </div>
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold flex items-center justify-center gap-2">
+          <Database className="h-8 w-8 text-blue-600" />
+          OBIS Marine Datasets
+        </h1>
+        <p className="text-gray-600 max-w-2xl mx-auto">
+          Explore real marine biodiversity datasets from OBIS with AI-powered analysis.
+        </p>
+      </div>
 
-        <Tabs defaultValue="browse" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-            <TabsTrigger value="browse">Browse Datasets</TabsTrigger>
-            <TabsTrigger value="upload">Upload Data</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="browse" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="browse">Browse Datasets</TabsTrigger>
+          <TabsTrigger value="analysis">Dataset Analysis</TabsTrigger>
+          <TabsTrigger value="statistics">OBIS Statistics</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="browse" className="space-y-6">
-            {/* Search and Filter */}
-            <Card className="shadow-float">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Search className="h-5 w-5" />
-                  <span>Search & Filter</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="search">Search datasets</Label>
-                    <Input
-                      id="search"
-                      placeholder="Search by name, species, or location..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-                  <div className="lg:w-48">
-                    <Label>Data Type</Label>
-                    <Select>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="All types" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Types</SelectItem>
-                        <SelectItem value="csv">CSV Files</SelectItem>
-                        <SelectItem value="json">JSON Files</SelectItem>
-                        <SelectItem value="images">Images</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="lg:w-48">
-                    <Label>Status</Label>
-                    <Select>
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="All statuses" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Statuses</SelectItem>
-                        <SelectItem value="validated">Validated</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="error">Error</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Datasets Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {filteredDatasets.map((dataset) => (
-                <Card key={dataset.id} className="shadow-float hover:shadow-ocean transition-all duration-300">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-gradient-ocean rounded-lg">
-                          {getTypeIcon(dataset.type)}
-                        </div>
-                        <div>
-                          <CardTitle className="text-lg">{dataset.name}</CardTitle>
-                          <CardDescription>{dataset.size} • {dataset.records} records</CardDescription>
-                        </div>
-                      </div>
-                      <Badge className={getStatusColor(dataset.status)}>
-                        {dataset.status}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center space-x-2">
-                        <Tag className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Species:</span>
-                        <span className="font-medium">{dataset.species}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Location:</span>
-                        <span className="font-medium">{dataset.location}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Date:</span>
-                        <span className="font-medium">{dataset.date}</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Database className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Type:</span>
-                        <span className="font-medium">{dataset.type}</span>
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label className="text-sm text-muted-foreground">Parameters</Label>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {dataset.parameters.map((param, index) => (
-                          <Badge key={index} variant="outline" className="text-xs">
-                            {param}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="flex space-x-2 pt-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        View Details
-                      </Button>
-                      <Button size="sm" className="flex-1 bg-gradient-ocean">
-                        Download
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="upload" className="space-y-6">
-            <Card className="shadow-float">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Upload className="h-5 w-5" />
-                  <span>Upload New Dataset</span>
-                </CardTitle>
-                <CardDescription>
-                  Upload CSV, JSON, or image files for marine research data
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* File Upload */}
-                <div className="border-2 border-dashed border-border rounded-lg p-8 text-center">
-                  <Upload className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                  <h3 className="text-lg font-medium mb-2">Drop files here or click to browse</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Supported formats: CSV, JSON, JPG, PNG (Max 100MB)
-                  </p>
+        <TabsContent value="browse" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                OBIS Dataset Browser
+              </CardTitle>
+              <CardDescription>
+                Browse and search through real marine biodiversity datasets from OBIS
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-4">
+                <div className="flex-1">
                   <Input
-                    type="file"
-                    multiple
-                    accept=".csv,.json,.jpg,.jpeg,.png"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    id="file-upload"
+                    placeholder="Search datasets by title or description..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
                   />
-                  <Button asChild className="bg-gradient-ocean">
-                    <label htmlFor="file-upload" className="cursor-pointer">
-                      Select Files
-                    </label>
+                </div>
+                <Button onClick={loadDatasets} disabled={loading}>
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Search className="h-4 w-4 mr-2" />}
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="text-sm text-gray-600">
+                Showing {filteredDatasets.length} of {totalDatasets} datasets from OBIS
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin mr-3" />
+                  <span>Loading OBIS datasets...</span>
+                </div>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {filteredDatasets.map((dataset) => (
+                    <Card key={dataset.id} className="hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <CardTitle className="text-base">{dataset.title}</CardTitle>
+                            <div className="flex gap-2 mt-2">
+                              <Badge variant="outline">ID: {dataset.id}</Badge>
+                              {dataset.records && (
+                                <Badge variant="secondary">{dataset.records.toLocaleString()} records</Badge>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="text-sm text-gray-600 mb-3">
+                          {dataset.abstract || dataset.description || 'No description available'}
+                        </div>
+                        {dataset.extent && (
+                          <div className="text-xs text-gray-500 space-y-1 mb-3">
+                            {dataset.extent.spatial && (
+                              <div><strong>Spatial:</strong> {dataset.extent.spatial}</div>
+                            )}
+                            {dataset.extent.temporal && (
+                              <div><strong>Temporal:</strong> {dataset.extent.temporal}</div>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex gap-2">
+                          <Button 
+                            onClick={() => analyzeDataset(dataset)} 
+                            disabled={loading}
+                            className="flex-1"
+                            size="sm"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Analyze with AI
+                          </Button>
+                          <Button 
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <a 
+                              href={dataset.url || `https://obis.org/dataset/${dataset.id}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {totalPages > 1 && (
+                <div className="flex justify-center gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                    disabled={currentPage === 0 || loading}
+                  >
+                    Previous
+                  </Button>
+                  <span className="flex items-center px-4">
+                    Page {currentPage + 1} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
+                    disabled={currentPage >= totalPages - 1 || loading}
+                  >
+                    Next
                   </Button>
                 </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                {/* Metadata Form */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="dataset-name">Dataset Name</Label>
-                      <Input id="dataset-name" placeholder="Enter dataset name" />
-                    </div>
-                    <div>
-                      <Label htmlFor="species">Species</Label>
-                      <Input id="species" placeholder="e.g., Coastal Fish, Plankton" />
-                    </div>
-                    <div>
-                      <Label htmlFor="location">Sampling Location</Label>
-                      <Input id="location" placeholder="e.g., Arabian Sea, Kerala Coast" />
-                    </div>
+        <TabsContent value="analysis" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Dataset Analysis Results
+              </CardTitle>
+              <CardDescription>
+                AI-powered analysis of selected OBIS dataset
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {selectedDataset ? (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="font-medium text-blue-900">{selectedDataset.title}</h3>
+                    <p className="text-sm text-blue-700 mt-1">Dataset ID: {selectedDataset.id}</p>
+                    {selectedDataset.records && (
+                      <p className="text-sm text-blue-700">Records: {selectedDataset.records.toLocaleString()}</p>
+                    )}
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="date">Collection Date</Label>
-                      <Input id="date" type="date" />
-                    </div>
-                    <div>
-                      <Label htmlFor="parameters">Parameters Measured</Label>
-                      <Input id="parameters" placeholder="e.g., Temperature, Salinity, pH" />
-                    </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Input id="description" placeholder="Brief description of the dataset" />
-                    </div>
-                  </div>
-                </div>
 
-                <div className="flex justify-end space-x-3">
-                  <Button variant="outline">Save as Draft</Button>
-                  <Button className="bg-gradient-ocean">Upload & Process</Button>
+                  {datasetAnalysis && (
+                    <Card className="bg-gray-50">
+                      <CardContent className="pt-6">
+                        {datasetAnalysis.error ? (
+                          <div className="text-red-600">
+                            <strong>Error:</strong> {datasetAnalysis.error}
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <Badge variant="secondary">AI Analysis Complete</Badge>
+                            
+                            <div>
+                              <h4 className="font-medium mb-2">Dataset Overview:</h4>
+                              <p className="text-sm text-gray-600">
+                                {selectedDataset.records ? `${selectedDataset.records.toLocaleString()} records` : 'Unknown record count'} 
+                                from OBIS dataset "{selectedDataset.title}"
+                              </p>
+                            </div>
+                            
+                            <div>
+                              <h4 className="font-medium mb-2">AI Analysis:</h4>
+                              <Markdown content={datasetAnalysis.ai_analysis} className="text-sm" />
+                            </div>
+                            
+                            {datasetAnalysis.summary && (
+                              <div>
+                                <h4 className="font-medium mb-2">Summary:</h4>
+                                <Markdown content={datasetAnalysis.summary} className="text-sm" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Select a dataset from the Browse tab to see AI analysis results here.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="statistics" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                OBIS Global Statistics
+              </CardTitle>
+              <CardDescription>
+                Real-time statistics from the OBIS marine biodiversity database
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin mr-2" />
+                  <span>Loading statistics...</span>
+                </div>
+              ) : statistics ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Object.entries(statistics).map(([key, value]) => (
+                    <Card key={key} className="bg-gradient-to-br from-blue-50 to-indigo-50">
+                      <CardContent className="pt-6">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {typeof value === 'number' ? value.toLocaleString() : String(value)}
+                          </div>
+                          <div className="text-sm text-gray-600 capitalize">
+                            {key.replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>Statistics not available at the moment.</p>
+                  <Button onClick={loadStatistics} variant="outline" className="mt-4">
+                    <Activity className="h-4 w-4 mr-2" />
+                    Retry Loading
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

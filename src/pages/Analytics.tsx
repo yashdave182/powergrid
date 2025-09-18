@@ -1,87 +1,70 @@
-import { useState } from "react";
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Brain, TrendingUp, Zap, AlertCircle, CheckCircle, Clock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Brain, TrendingUp, Database, Search, BarChart3, Clock } from "lucide-react";
+import { toast } from "sonner";
+import { obisGeminiService } from '@/services/obisGeminiService';
+import { Markdown } from '@/components/ui/markdown';
 
 const Analytics = () => {
   const [analysisRunning, setAnalysisRunning] = useState(false);
-  const [selectedAnalysis, setSelectedAnalysis] = useState("correlation");
-  const { toast } = useToast();
+  const [selectedSpecies, setSelectedSpecies] = useState('');
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [obisData, setObisData] = useState<any>(null);
+  const [analysisResults, setAnalysisResults] = useState<any>(null);
+  const [statistics, setStatistics] = useState<any>(null);
 
-  const correlationResults = [
-    { variables: "Temperature vs Species Richness", correlation: -0.72, significance: "p < 0.01", strength: "Strong Negative" },
-    { variables: "Salinity vs Fish Abundance", correlation: 0.45, significance: "p < 0.05", strength: "Moderate Positive" },
-    { variables: "pH vs Plankton Diversity", correlation: 0.38, significance: "p < 0.05", strength: "Weak Positive" },
-    { variables: "Depth vs Species Count", correlation: -0.56, significance: "p < 0.01", strength: "Moderate Negative" },
-  ];
+  useEffect(() => {
+    loadStatistics();
+  }, []);
 
-  const aiInsights = [
-    {
-      id: 1,
-      title: "Temperature-Biodiversity Relationship",
-      insight: "Analysis reveals a strong negative correlation between water temperature and species richness. As temperatures rise above 30°C, biodiversity indices drop significantly, suggesting thermal stress on marine ecosystems.",
-      confidence: 92,
-      type: "correlation",
-    },
-    {
-      id: 2,
-      title: "Seasonal Migration Pattern",
-      insight: "Machine learning models detect distinct seasonal patterns in fish abundance data. Peak abundances occur during monsoon periods (June-September), indicating strong correlation with seasonal environmental changes.",
-      confidence: 87,
-      type: "pattern",
-    },
-    {
-      id: 3,
-      title: "Coastal vs Deep-sea Diversity",
-      insight: "Comparative analysis shows coastal regions have 40% higher species diversity but 25% lower individual abundance compared to deeper waters. This suggests different ecological strategies in varying depth zones.",
-      confidence: 78,
-      type: "comparison",
-    },
-  ];
-
-  const analysisQueue = [
-    { id: 1, name: "Monsoon Impact Analysis", status: "completed", progress: 100, duration: "2.3 min" },
-    { id: 2, name: "Species Migration Tracking", status: "running", progress: 67, duration: "1.2 min remaining" },
-    { id: 3, name: "Water Quality Correlation", status: "queued", progress: 0, duration: "Pending" },
-    { id: 4, name: "Biodiversity Index Calculation", status: "queued", progress: 0, duration: "Pending" },
-  ];
-
-  const runAnalysis = () => {
-    setAnalysisRunning(true);
-    toast({
-      title: "Analysis started",
-      description: "Your correlation analysis is now running. Results will be available shortly.",
-    });
-    
-    // Simulate analysis
-    setTimeout(() => {
-      setAnalysisRunning(false);
-      toast({
-        title: "Analysis complete",
-        description: "Your correlation analysis has finished. Check the results below.",
-      });
-    }, 3000);
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed": return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case "running": return <Clock className="h-4 w-4 text-blue-600 animate-spin" />;
-      case "queued": return <Clock className="h-4 w-4 text-gray-400" />;
-      default: return <AlertCircle className="h-4 w-4 text-red-600" />;
+  const loadStatistics = async () => {
+    try {
+      const stats = await obisGeminiService.fetchOBISStatistics();
+      setStatistics(stats);
+    } catch (error) {
+      console.error('Error loading statistics:', error);
     }
   };
 
-  const getConfidenceColor = (confidence: number) => {
-    if (confidence >= 90) return "text-green-600";
-    if (confidence >= 70) return "text-yellow-600";
-    return "text-red-600";
+  const runSpeciesAnalysis = async () => {
+    if (!selectedSpecies.trim()) {
+      toast.error('Please enter a species name');
+      return;
+    }
+
+    setAnalysisRunning(true);
+    try {
+      const analysis = await obisGeminiService.searchSpeciesWithAI(selectedSpecies, undefined, 100);
+      setAnalysisResults(analysis);
+      setObisData(analysis.obis_data);
+      toast.success('Species analysis completed successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to analyze species');
+    } finally {
+      setAnalysisRunning(false);
+    }
+  };
+
+  const runRegionalAnalysis = async () => {
+    if (!selectedRegion.trim()) {
+      toast.error('Please enter region coordinates');
+      return;
+    }
+
+    setAnalysisRunning(true);
+    try {
+      const analysis = await obisGeminiService.getMarineInsightsForRegion(selectedRegion, 'Selected Region');
+      setAnalysisResults({ ai_analysis: analysis });
+      toast.success('Regional analysis completed successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to analyze region');
+    } finally {
+      setAnalysisRunning(false);
+    }
   };
 
   return (
@@ -89,253 +72,279 @@ const Analytics = () => {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Analytics Engine</h1>
-          <p className="text-muted-foreground">AI-powered analysis and insights for marine research data</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">OBIS Marine Analytics</h1>
+          <p className="text-muted-foreground">Real-time analysis of marine biodiversity data from OBIS with AI insights</p>
         </div>
 
-        <Tabs defaultValue="correlations" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
-            <TabsTrigger value="correlations">Correlations</TabsTrigger>
-            <TabsTrigger value="insights">AI Insights</TabsTrigger>
-            <TabsTrigger value="queue">Analysis Queue</TabsTrigger>
+        <Tabs defaultValue="species" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 lg:w-[500px]">
+            <TabsTrigger value="species">Species Analysis</TabsTrigger>
+            <TabsTrigger value="regional">Regional Analysis</TabsTrigger>
+            <TabsTrigger value="statistics">OBIS Statistics</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="correlations" className="space-y-6">
-            {/* Analysis Controls */}
+          <TabsContent value="species" className="space-y-6">
+            {/* Species Analysis Controls */}
             <Card className="shadow-float">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Brain className="h-5 w-5" />
-                  <span>Correlation Analysis</span>
+                  <Search className="h-5 w-5" />
+                  <span>Species Biodiversity Analysis</span>
                 </CardTitle>
                 <CardDescription>
-                  Discover relationships between environmental factors and marine biodiversity
+                  Analyze species distribution, abundance, and ecological patterns using real OBIS data
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium">Primary Variable</label>
-                    <Select defaultValue="temperature">
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="temperature">Water Temperature</SelectItem>
-                        <SelectItem value="salinity">Salinity</SelectItem>
-                        <SelectItem value="ph">pH Level</SelectItem>
-                        <SelectItem value="depth">Depth</SelectItem>
-                        <SelectItem value="oxygen">Dissolved Oxygen</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <label className="text-sm font-medium">Species Scientific Name</label>
+                    <Input
+                      className="mt-1"
+                      placeholder="e.g., Thunnus albacares"
+                      value={selectedSpecies}
+                      onChange={(e) => setSelectedSpecies(e.target.value)}
+                    />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">Secondary Variable</label>
-                    <Select defaultValue="species">
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="species">Species Richness</SelectItem>
-                        <SelectItem value="abundance">Fish Abundance</SelectItem>
-                        <SelectItem value="diversity">Shannon Diversity</SelectItem>
-                        <SelectItem value="biomass">Total Biomass</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">Method</label>
-                    <Select defaultValue="pearson">
-                      <SelectTrigger className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pearson">Pearson Correlation</SelectItem>
-                        <SelectItem value="spearman">Spearman Rank</SelectItem>
-                        <SelectItem value="kendall">Kendall Tau</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={runSpeciesAnalysis} 
+                      disabled={analysisRunning}
+                      className="bg-gradient-ocean w-full"
+                    >
+                      {analysisRunning ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Database className="h-4 w-4 mr-2" />
+                          Analyze Species
+                        </>
+                      )}
+                    </Button>
                   </div>
                 </div>
-                <Button 
-                  onClick={runAnalysis} 
-                  disabled={analysisRunning}
-                  className="bg-gradient-ocean"
-                >
-                  {analysisRunning ? (
-                    <>
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                      Running Analysis...
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="h-4 w-4 mr-2" />
-                      Run Correlation Analysis
-                    </>
-                  )}
-                </Button>
               </CardContent>
             </Card>
 
-            {/* Results */}
-            <Card className="shadow-float">
-              <CardHeader>
-                <CardTitle>Correlation Results</CardTitle>
-                <CardDescription>Statistical relationships between variables</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {correlationResults.map((result, index) => (
-                    <div key={index} className="p-4 border border-border rounded-lg hover:shadow-float transition-shadow">
-                      <div className="flex justify-between items-start mb-2">
-                        <h4 className="font-medium">{result.variables}</h4>
-                        <Badge variant="outline">{result.strength}</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
-                        <div>
-                          <span className="text-muted-foreground">Correlation:</span>
-                          <span className={`ml-2 font-mono font-bold ${result.correlation < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {result.correlation.toFixed(2)}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Significance:</span>
-                          <span className="ml-2 font-medium">{result.significance}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Strength:</span>
-                          <span className="ml-2 font-medium">{result.strength}</span>
-                        </div>
-                      </div>
+            {/* Species Analysis Results */}
+            {analysisResults && obisData && (
+              <Card className="shadow-float">
+                <CardHeader>
+                  <CardTitle>Species Analysis Results</CardTitle>
+                  <CardDescription>
+                    AI-powered analysis of {selectedSpecies} based on {obisData.total} OBIS records
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Data Summary */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <Card className="bg-blue-50">
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {obisData.total?.toLocaleString() || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Total Records</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-green-50">
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-green-600">
+                              {obisData.results?.length || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Retrieved Samples</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-purple-50">
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              {new Set(obisData.results?.map((r: any) => r.locality)).size || 0}
+                            </div>
+                            <div className="text-sm text-gray-600">Unique Locations</div>
+                          </div>
+                        </CardContent>
+                      </Card>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+
+                    {/* AI Analysis */}
+                    <div>
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <Brain className="h-4 w-4" />
+                        AI Analysis & Insights
+                      </h4>
+                      <Card className="bg-gray-50">
+                        <CardContent className="pt-6">
+                          <Markdown content={analysisResults.ai_analysis} className="text-sm" />
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* Detailed Insights */}
+                    {analysisResults.insights && (
+                      <div>
+                        <h4 className="font-medium mb-3">Detailed Ecological Insights</h4>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Species Diversity</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <Markdown content={analysisResults.insights.species_diversity} className="text-sm" />
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Geographic Distribution</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <Markdown content={analysisResults.insights.geographic_distribution} className="text-sm" />
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Conservation Status</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <Markdown content={analysisResults.insights.conservation_status} className="text-sm" />
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className="text-base">Threats & Recommendations</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                              <Markdown content={analysisResults.insights.threats_and_recommendations} className="text-sm" />
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="insights" className="space-y-6">
-            <div className="grid gap-6">
-              {aiInsights.map((insight) => (
-                <Card key={insight.id} className="shadow-float">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="flex items-center space-x-2">
-                          <Brain className="h-5 w-5" />
-                          <span>{insight.title}</span>
-                        </CardTitle>
-                        <CardDescription>AI-generated insight from data analysis</CardDescription>
-                      </div>
-                      <div className="text-right">
-                        <div className={`text-2xl font-bold ${getConfidenceColor(insight.confidence)}`}>
-                          {insight.confidence}%
-                        </div>
-                        <div className="text-xs text-muted-foreground">Confidence</div>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      <p className="text-foreground leading-relaxed">{insight.insight}</p>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary">{insight.type}</Badge>
-                        <div className="text-sm text-muted-foreground">
-                          Generated using machine learning algorithms
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
+          <TabsContent value="regional" className="space-y-6">
+            {/* Regional Analysis Controls */}
             <Card className="shadow-float">
               <CardHeader>
-                <CardTitle>Custom Analysis Request</CardTitle>
-                <CardDescription>Describe what you'd like to analyze in natural language</CardDescription>
+                <CardTitle className="flex items-center space-x-2">
+                  <BarChart3 className="h-5 w-5" />
+                  <span>Regional Biodiversity Analysis</span>
+                </CardTitle>
+                <CardDescription>
+                  Analyze marine biodiversity patterns in specific geographic regions
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Textarea 
-                  placeholder="e.g., 'Find the relationship between monsoon rainfall and fish migration patterns in the Arabian Sea during 2024'"
-                  className="min-h-[100px]"
-                />
-                <Button className="bg-gradient-coral">
-                  <Brain className="h-4 w-4 mr-2" />
-                  Generate AI Analysis
-                </Button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium">Region Coordinates (WKT Format)</label>
+                    <Input
+                      className="mt-1"
+                      placeholder="e.g., POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))"
+                      value={selectedRegion}
+                      onChange={(e) => setSelectedRegion(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex items-end">
+                    <Button 
+                      onClick={runRegionalAnalysis} 
+                      disabled={analysisRunning}
+                      className="bg-gradient-ocean w-full"
+                    >
+                      {analysisRunning ? (
+                        <>
+                          <Clock className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <BarChart3 className="h-4 w-4 mr-2" />
+                          Analyze Region
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
+
+            {/* Regional Analysis Results */}
+            {analysisResults && analysisResults.ai_analysis && !obisData && (
+              <Card className="shadow-float">
+                <CardHeader>
+                  <CardTitle>Regional Analysis Results</CardTitle>
+                  <CardDescription>
+                    AI-powered analysis of marine biodiversity in the selected region
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <Brain className="h-4 w-4" />
+                        Regional Biodiversity Insights
+                      </h4>
+                      <Card className="bg-gray-50">
+                        <CardContent className="pt-6">
+                          <Markdown content={analysisResults.ai_analysis} className="text-sm" />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          <TabsContent value="queue" className="space-y-6">
+          <TabsContent value="statistics" className="space-y-6">
+            {/* Global OBIS Statistics */}
             <Card className="shadow-float">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <TrendingUp className="h-5 w-5" />
-                  <span>Analysis Queue</span>
+                  <span>Global OBIS Statistics</span>
                 </CardTitle>
-                <CardDescription>Monitor running and scheduled analysis tasks</CardDescription>
+                <CardDescription>
+                  Real-time statistics from the Ocean Biodiversity Information System
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {analysisQueue.map((item) => (
-                    <div key={item.id} className="p-4 border border-border rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center space-x-3">
-                          {getStatusIcon(item.status)}
-                          <div>
-                            <h4 className="font-medium">{item.name}</h4>
-                            <p className="text-sm text-muted-foreground">{item.duration}</p>
+                {statistics ? (
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {Object.entries(statistics).map(([key, value]) => (
+                      <Card key={key} className="bg-gradient-to-br from-blue-50 to-indigo-50">
+                        <CardContent className="pt-6">
+                          <div className="text-center">
+                            <div className="text-2xl font-bold text-blue-600">
+                              {typeof value === 'number' ? value.toLocaleString() : String(value)}
+                            </div>
+                            <div className="text-sm text-gray-600 capitalize">
+                              {key.replace(/_/g, ' ')}
+                            </div>
                           </div>
-                        </div>
-                        <Badge 
-                          variant={item.status === "completed" ? "default" : "secondary"}
-                          className={item.status === "completed" ? "bg-green-100 text-green-800" : ""}
-                        >
-                          {item.status}
-                        </Badge>
-                      </div>
-                      {item.status !== "queued" && (
-                        <Progress value={item.progress} className="h-2" />
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>Loading global statistics...</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="shadow-float">
-                <CardHeader>
-                  <CardTitle>Queue Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-primary">4</div>
-                  <p className="text-sm text-muted-foreground">Total jobs</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-float">
-                <CardHeader>
-                  <CardTitle>Processing Time</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-accent">1.2 min</div>
-                  <p className="text-sm text-muted-foreground">Average duration</p>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-float">
-                <CardHeader>
-                  <CardTitle>Success Rate</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-green-600">98.5%</div>
-                  <p className="text-sm text-muted-foreground">Last 30 days</p>
-                </CardContent>
-              </Card>
-            </div>
           </TabsContent>
         </Tabs>
       </div>

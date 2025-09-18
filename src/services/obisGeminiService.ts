@@ -60,6 +60,62 @@ interface EnhancedMarineAnalysis {
 class OBISGeminiService {
   private obisBaseUrl = 'https://api.obis.org/v3';
 
+  // Fetch list of available OBIS datasets
+  async fetchOBISDatasets(limit: number = 20, offset: number = 0): Promise<{ datasets: OBISDataset[], total: number }> {
+    try {
+      const response = await fetch(`${this.obisBaseUrl}/dataset?limit=${limit}&offset=${offset}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Datasets API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        datasets: data.results || [],
+        total: data.total || 0
+      };
+    } catch (error) {
+      console.error('Error fetching OBIS datasets:', error);
+      throw new Error(`Failed to fetch OBIS datasets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Fetch statistics for visualization
+  async fetchOBISStatistics(): Promise<any> {
+    try {
+      const response = await fetch(`${this.obisBaseUrl}/statistics`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Statistics API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS statistics:', error);
+      throw new Error(`Failed to fetch OBIS statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Fetch taxonomy data for analysis
+  async fetchOBISTaxonomy(scientificName?: string, rank?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (scientificName) params.append('scientificname', scientificName);
+      if (rank) params.append('rank', rank);
+      
+      const response = await fetch(`${this.obisBaseUrl}/taxon?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Taxonomy API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS taxonomy:', error);
+      throw new Error(`Failed to fetch OBIS taxonomy: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
   async searchSpeciesWithAI(
     scientificName?: string,
     geometry?: string,
@@ -96,7 +152,7 @@ class OBISGeminiService {
       const datasetData = await this.fetchOBISDataset(datasetId);
       
       // 2. Analyze dataset with AI
-      const aiAnalysis = await this.analyzeDatasetWithAI(datasetData);
+      const aiAnalysis = await this.analyzeDatasetDataWithAI(datasetData);
       
       // 3. Generate insights for dataset
       const insights = await this.generateDatasetInsights(datasetData);
@@ -211,7 +267,7 @@ Focus on scientifically accurate insights that would be valuable for marine rese
     return await geminiApi.generateContent(prompt);
   }
 
-  private async analyzeDatasetWithAI(dataset: OBISDataset): Promise<string> {
+  private async analyzeDatasetDataWithAI(dataset: OBISDataset): Promise<string> {
     const prompt = `Analyze this OBIS dataset as a marine biology expert:
 
 Dataset: ${dataset.title}
@@ -351,3 +407,95 @@ Provide a brief (3-4 sentences) summary covering:
 }
 
 export const obisGeminiService = new OBISGeminiService();
+
+// Additional methods for real OBIS data integration
+export const obisDataService = {
+  // Fetch real OBIS datasets
+  async fetchOBISDatasets(limit: number = 20, offset: number = 0): Promise<{ results: any[], total: number }> {
+    try {
+      const response = await fetch(`https://api.obis.org/v3/dataset?limit=${limit}&offset=${offset}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Dataset API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS datasets:', error);
+      throw new Error(`Failed to fetch datasets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get statistics for visualization
+  async getOBISStats(): Promise<any> {
+    try {
+      const response = await fetch(`https://api.obis.org/v3/statistics`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Statistics API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS statistics:', error);
+      throw new Error(`Failed to fetch statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get species occurrence data for charts
+  async getSpeciesOccurrenceData(params: {
+    scientificName?: string;
+    startDate?: string;
+    endDate?: string;
+    geometry?: string;
+    limit?: number;
+  }): Promise<any> {
+    try {
+      const urlParams = new URLSearchParams({
+        limit: (params.limit || 100).toString(),
+        offset: '0'
+      });
+
+      if (params.scientificName) urlParams.append('scientificname', params.scientificName);
+      if (params.startDate) urlParams.append('startdate', params.startDate);
+      if (params.endDate) urlParams.append('enddate', params.endDate);
+      if (params.geometry) urlParams.append('geometry', params.geometry);
+
+      const response = await fetch(`https://api.obis.org/v3/occurrence?${urlParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching species occurrence data:', error);
+      throw new Error(`Failed to fetch occurrence data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get taxa (taxonomic) data for diversity analysis
+  async getTaxaData(geometry?: string, limit: number = 100): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: '0'
+      });
+
+      if (geometry) {
+        params.append('geometry', geometry);
+      }
+
+      const response = await fetch(`https://api.obis.org/v3/taxon?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Taxa API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching taxa data:', error);
+      throw new Error(`Failed to fetch taxa data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+};
