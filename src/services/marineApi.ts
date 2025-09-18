@@ -197,8 +197,8 @@ export const marineApi = {
   ...dataIntegrationApi,
   ...healthApi,
   // Add direct API methods for AI endpoints
-  get: apiService.get,
-  post: apiService.post,
-  put: apiService.put,
-  delete: apiService.delete,
+  get: (endpoint: string) => apiService.get(endpoint),
+  post: (endpoint: string, data?: any) => apiService.post(endpoint, data),
+  put: (endpoint: string, data?: any) => apiService.put(endpoint, data),
+  delete: (endpoint: string) => apiService.delete(endpoint),
 };
