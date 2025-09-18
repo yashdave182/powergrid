@@ -82,11 +82,6 @@ export const biodiversityApi = {
   testConfiguration: async () => {
     return apiService.get('/biodiversity/test/config');
   },
-
-  // Test configuration
-  testConfiguration: async () => {
-    return apiService.get('/biodiversity/test/config');
-  },
 };
 
 // Oceanography API Services
@@ -192,4 +187,18 @@ export const healthApi = {
   checkHealth: async () => {
     return apiService.get('/health');
   },
+};
+
+// Combined marine API with all services
+export const marineApi = {
+  ...biodiversityApi,
+  ...oceanographyApi,
+  ...analyticsApi,
+  ...dataIntegrationApi,
+  ...healthApi,
+  // Add direct API methods for AI endpoints
+  get: apiService.get,
+  post: apiService.post,
+  put: apiService.put,
+  delete: apiService.delete,
 };
