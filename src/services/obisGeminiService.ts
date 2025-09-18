@@ -45,7 +45,7 @@ interface OBISDataset {
 }
 
 interface EnhancedMarineAnalysis {
-  obis_data: OBISResponse | OBISDataset;
+  obis_data: OBISResponse | OBISDataset | { metadata: OBISDataset; occurrences: OBISResponse };
   ai_analysis: string;
   insights: {
     species_diversity: string;
@@ -148,20 +148,31 @@ class OBISGeminiService {
 
   async analyzeDatasetWithAI(datasetId: string): Promise<EnhancedMarineAnalysis> {
     try {
-      // 1. Fetch dataset info from OBIS
-      const datasetData = await this.fetchOBISDataset(datasetId);
+      // 1. Fetch dataset metadata from OBIS
+      const datasetMetadata = await this.fetchOBISDataset(datasetId);
       
-      // 2. Analyze dataset with AI
-      const aiAnalysis = await this.analyzeDatasetDataWithAI(datasetData);
+      // 2. Fetch actual occurrence records from this dataset
+      const occurrenceData = await this.fetchOBISSpecies(undefined, undefined, 100, datasetId);
       
-      // 3. Generate insights for dataset
-      const insights = await this.generateDatasetInsights(datasetData);
+      // 3. Combine metadata with actual data for analysis
+      const combinedData = {
+        ...datasetMetadata,
+        occurrence_data: occurrenceData,
+        total_records: occurrenceData.total,
+        sample_records: occurrenceData.results
+      };
       
-      // 4. Create summary
-      const summary = await this.generateDatasetSummary(datasetData, aiAnalysis);
+      // 4. Analyze dataset with AI using real occurrence data
+      const aiAnalysis = await this.analyzeDatasetWithOccurrences(datasetMetadata, occurrenceData);
+      
+      // 5. Generate insights for dataset with real data
+      const insights = await this.generateDatasetInsights(combinedData);
+      
+      // 6. Create summary
+      const summary = await this.generateDatasetSummary(combinedData, aiAnalysis);
       
       return {
-        obis_data: datasetData,
+        obis_data: occurrenceData, // Return the occurrence data for the UI
         ai_analysis: aiAnalysis,
         insights,
         summary
@@ -207,7 +218,8 @@ Format your response as a detailed scientific analysis suitable for researchers 
   private async fetchOBISSpecies(
     scientificName?: string,
     geometry?: string,
-    limit: number = 100
+    limit: number = 100,
+    datasetId?: string
   ): Promise<OBISResponse> {
     const params = new URLSearchParams({
       limit: limit.toString(),
@@ -219,6 +231,9 @@ Format your response as a detailed scientific analysis suitable for researchers 
     }
     if (geometry) {
       params.append('geometry', geometry);
+    }
+    if (datasetId) {
+      params.append('datasetid', datasetId);
     }
 
     const response = await fetch(`${this.obisBaseUrl}/occurrence?${params}`);
@@ -291,6 +306,64 @@ Provide insights suitable for marine researchers and data managers.`;
     return await geminiApi.generateContent(prompt);
   }
 
+  // New method to analyze dataset WITH actual occurrence data
+  private async analyzeDatasetWithOccurrences(dataset: OBISDataset, occurrences: OBISResponse): Promise<string> {
+    const prompt = `Analyze this OBIS dataset with actual occurrence data as a marine biology expert:
+
+**Dataset Metadata:**
+Title: ${dataset.title}
+ID: ${dataset.id}
+Description: ${dataset.description || 'No description available'}
+Total Records: ${dataset.records || 'Unknown'}
+Spatial extent: ${dataset.extent?.spatial || 'Not specified'}
+Temporal extent: ${dataset.extent?.temporal || 'Not specified'}
+
+**Actual Occurrence Data Sample (${occurrences.results.length} of ${occurrences.total} records):**
+${JSON.stringify(occurrences.results.slice(0, 10), null, 2)}
+
+**Analysis Instructions:**
+Now that you have REAL occurrence data, please provide comprehensive analysis on:
+
+1. **Species Diversity Analysis:**
+   - Taxonomic composition from actual records
+   - Species abundance patterns
+   - Biodiversity metrics based on real data
+
+2. **Geographic Distribution Patterns:**
+   - Spatial distribution from coordinates
+   - Depth ranges and habitat preferences
+   - Geographic hotspots and gaps
+
+3. **Temporal Patterns:**
+   - Seasonal occurrence patterns
+   - Long-term trends if applicable
+   - Data collection timeline
+
+4. **Data Quality Assessment:**
+   - Completeness of taxonomic identification
+   - Geographic precision and accuracy
+   - Temporal coverage and gaps
+
+5. **Ecological Insights:**
+   - Community structure analysis
+   - Habitat associations
+   - Environmental correlations
+
+6. **Conservation Implications:**
+   - Threatened species presence
+   - Protected area coverage
+   - Conservation priorities
+
+7. **Research Applications:**
+   - Specific research questions this data can address
+   - Integration opportunities with other datasets
+   - Future research directions
+
+Provide scientifically rigorous insights based on the ACTUAL DATA rather than general speculation.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
   private async generateDetailedInsights(
     data: OBISResponse,
     scientificName?: string
@@ -336,6 +409,19 @@ Provide insights suitable for marine researchers and data managers.`;
     };
   }
 
+  // Generate insights WITH actual occurrence data
+  private async generateDatasetInsightsWithOccurrences(dataset: OBISDataset, occurrences: OBISResponse): Promise<EnhancedMarineAnalysis['insights']> {
+    const baseData = `Dataset: ${dataset.title} (${dataset.records} records)\nSample occurrence data: ${JSON.stringify(occurrences.results.slice(0, 5), null, 2)}`;
+    
+    return {
+      species_diversity: await geminiApi.generateContent(`${baseData}\n\nAnalyze actual species diversity patterns based on the occurrence records. Focus on taxonomic composition, species richness, and abundance patterns.`),
+      geographic_distribution: await geminiApi.generateContent(`${baseData}\n\nAnalyze geographic distribution patterns from the actual coordinates and localities. Identify spatial hotspots, depth ranges, and habitat preferences.`),
+      conservation_status: await geminiApi.generateContent(`${baseData}\n\nAssess conservation implications based on actual species records. Identify any threatened species, protected area coverage, and conservation priorities.`),
+      ecological_significance: await geminiApi.generateContent(`${baseData}\n\nExplain ecological significance based on actual species composition and environmental data. Focus on ecosystem roles and ecological relationships.`),
+      threats_and_recommendations: await geminiApi.generateContent(`${baseData}\n\nIdentify threats and provide recommendations based on actual species distributions and habitat data. Include specific conservation actions.`)
+    };
+  }
+
   private async generateSummary(
     data: OBISResponse,
     analysis: string,
@@ -359,22 +445,53 @@ Keep it accessible for both scientists and policy makers.`;
   }
 
   private async generateDatasetSummary(
-    dataset: OBISDataset,
+    dataset: any,
     analysis: string
   ): Promise<string> {
+    const hasOccurrenceData = dataset.sample_records && dataset.sample_records.length > 0;
+    
     const prompt = `Create an executive summary for this OBIS dataset analysis:
 
 Dataset: ${dataset.title}
-Records: ${dataset.records}
-Analysis: ${analysis.substring(0, 500)}...
+Total Records: ${dataset.total_records || dataset.records}
+${hasOccurrenceData ? `Analyzed Records: ${dataset.sample_records.length}
+Species Found: ${new Set(dataset.sample_records.map((r: any) => r.scientificName).filter(Boolean)).size}
+` : ''}Analysis: ${analysis.substring(0, 500)}...
 
 Provide a 2-3 paragraph summary highlighting:
-1. Dataset scope and scientific value
+1. Dataset scope and scientific value${hasOccurrenceData ? ' (based on actual data)' : ''}
 2. Key applications and research potential
 3. Conservation and management relevance
 4. Integration opportunities
+${hasOccurrenceData ? '5. Key findings from occurrence data analysis' : ''}
 
 Target audience: marine researchers and data managers.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  // Generate summary WITH actual occurrence data
+  private async generateDatasetSummaryWithOccurrences(
+    dataset: OBISDataset,
+    occurrences: OBISResponse,
+    analysis: string
+  ): Promise<string> {
+    const prompt = `Create an executive summary for this OBIS dataset analysis with real occurrence data:
+
+Dataset: ${dataset.title}
+Total Records: ${dataset.records}
+Analyzed Records: ${occurrences.results.length} of ${occurrences.total}
+Key Species Found: ${[...new Set(occurrences.results.map(r => r.scientificName).filter(Boolean))].slice(0, 5).join(', ')}
+Analysis: ${analysis.substring(0, 500)}...
+
+Provide a 2-3 paragraph summary highlighting:
+1. Dataset scope and actual biodiversity content
+2. Key species and ecological findings from real data
+3. Geographic distribution and habitat insights
+4. Conservation implications and research applications
+5. Data quality and completeness assessment
+
+Target audience: marine researchers and conservation managers.`;
 
     return await geminiApi.generateContent(prompt);
   }
