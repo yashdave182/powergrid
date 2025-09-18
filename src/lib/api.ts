@@ -1,6 +1,6 @@
 // API Configuration and Base Service
-// Force localhost for development - override any environment variables
-const API_BASE_URL = 'http://localhost:8000/api/v1';
+// Use environment variable for deployment, fallback to localhost for development
+const API_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1').replace(/\/+$/,'');
 
 export interface ApiResponse<T> {
   data?: T;

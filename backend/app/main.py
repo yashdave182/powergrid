@@ -32,15 +32,17 @@ logger.info("Raw ALLOWED_ORIGINS env var: %s", os.getenv('ALLOWED_ORIGINS'))
 logger.info("Parsed allowed_origins: %s", settings.allowed_origins)
 
 if settings.debug:
+    # Development - allow all origins for testing
     cors_origins = ["*"]
     cors_allow_credentials = False
 else:
-    # Temporarily allow all origins for debugging
-    cors_origins = ["*"]
-    cors_allow_credentials = False
-    # Production config:
-    # cors_origins = settings.allowed_origins
-    # cors_allow_credentials = True
+    # Production - allow Vercel domains and specific origins
+    cors_origins = [
+        "https://*.vercel.app",
+        "https://marine-data-platform.vercel.app",  # Replace with your actual Vercel domain
+        "https://your-custom-domain.com",  # Replace with your custom domain if any
+    ]
+    cors_allow_credentials = True
 
 logger.info("CORS configuration: origins=%s, allow_credentials=%s", cors_origins, cors_allow_credentials)
 
