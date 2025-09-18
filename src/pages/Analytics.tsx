@@ -209,7 +209,7 @@ const Analytics = () => {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-blue-600">
-                              {obisData.total?.toLocaleString() || 0}
+                              {(obisData?.total || 0).toLocaleString()}
                             </div>
                             <div className="text-sm text-gray-600">Total Records</div>
                           </div>
@@ -219,7 +219,7 @@ const Analytics = () => {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-green-600">
-                              {obisData.results?.length || 0}
+                              {obisData?.results?.length || 0}
                             </div>
                             <div className="text-sm text-gray-600">Retrieved Samples</div>
                           </div>
@@ -229,7 +229,7 @@ const Analytics = () => {
                         <CardContent className="pt-6">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-purple-600">
-                              {new Set(obisData.results?.map((r: any) => r.locality)).size || 0}
+                              {new Set(obisData?.results?.map((r: any) => r?.locality).filter(Boolean)).size || 0}
                             </div>
                             <div className="text-sm text-gray-600">Unique Locations</div>
                           </div>
@@ -245,7 +245,7 @@ const Analytics = () => {
                       </h4>
                       <Card className="bg-gray-50">
                         <CardContent className="pt-6">
-                          <Markdown content={analysisResults.ai_analysis} className="text-sm" />
+                          <Markdown content={analysisResults?.ai_analysis || 'No analysis available'} className="text-sm" />
                         </CardContent>
                       </Card>
                     </div>
@@ -260,7 +260,7 @@ const Analytics = () => {
                               <CardTitle className="text-base">Species Diversity</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <Markdown content={analysisResults.insights.species_diversity} className="text-sm" />
+                              <Markdown content={analysisResults?.insights?.species_diversity || 'No data available'} className="text-sm" />
                             </CardContent>
                           </Card>
                           <Card>
@@ -268,7 +268,7 @@ const Analytics = () => {
                               <CardTitle className="text-base">Geographic Distribution</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <Markdown content={analysisResults.insights.geographic_distribution} className="text-sm" />
+                              <Markdown content={analysisResults?.insights?.geographic_distribution || 'No data available'} className="text-sm" />
                             </CardContent>
                           </Card>
                           <Card>
@@ -276,7 +276,7 @@ const Analytics = () => {
                               <CardTitle className="text-base">Conservation Status</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <Markdown content={analysisResults.insights.conservation_status} className="text-sm" />
+                              <Markdown content={analysisResults?.insights?.conservation_status || 'No data available'} className="text-sm" />
                             </CardContent>
                           </Card>
                           <Card>
@@ -284,7 +284,7 @@ const Analytics = () => {
                               <CardTitle className="text-base">Threats & Recommendations</CardTitle>
                             </CardHeader>
                             <CardContent>
-                              <Markdown content={analysisResults.insights.threats_and_recommendations} className="text-sm" />
+                              <Markdown content={analysisResults?.insights?.threats_and_recommendations || 'No data available'} className="text-sm" />
                             </CardContent>
                           </Card>
                         </div>
@@ -374,7 +374,7 @@ const Analytics = () => {
                       </h4>
                       <Card className="bg-gray-50">
                         <CardContent className="pt-6">
-                          <Markdown content={analysisResults.ai_analysis} className="text-sm" />
+                          <Markdown content={analysisResults?.ai_analysis || 'No analysis available'} className="text-sm" />
                         </CardContent>
                       </Card>
                     </div>

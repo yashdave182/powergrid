@@ -145,9 +145,9 @@ const Datasets: React.FC = () => {
   };
 
   const filteredDatasets = datasets.filter(dataset =>
-    dataset.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dataset.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    dataset.abstract?.toLowerCase().includes(searchTerm.toLowerCase())
+    (dataset.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (dataset.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (dataset.abstract || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const totalPages = Math.ceil(totalDatasets / datasetsPerPage);
