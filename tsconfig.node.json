@@ -1,47 +1,38 @@
-<<<<<<< HEAD
 {
   "compilerOptions": {
+    /* 🎯 Target & Module */
     "target": "ES2022",
-    "lib": ["ES2023"],
     "module": "ESNext",
-    "skipLibCheck": true,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
 
-    /* Bundler mode */
+    /* 🧱 Bundler Mode (Vite, webpack 5+, etc.) */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
 
-    /* Linting */
+    /* 🔍 Type Checking & Strictness */
     "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
-  },
-  "include": ["vite.config.ts"]
-}
-=======
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2023"],
-    "module": "ESNext",
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
 
-    /* Bundler mode */
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+    /* 🗺️ Path Mapping (Optional but Recommended) */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
 
-    /* Linting */
-    "strict": true,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
-    "noFallthroughCasesInSwitch": true
+    /* 🖼️ JSX Support (if using React, Vue, Solid, etc.) */
+    "jsx": "react-jsx" // or "preserve" / "react" depending on framework
   },
-  "include": ["vite.config.ts"]
+
+  /* 📁 Include Source Files */
+  "include": ["src", "vite.config.ts"],
+
+  /* 🚫 Exclude node_modules and build folders */
+  "exclude": ["node_modules", "dist", "build"]
 }
->>>>>>> 362b52b683dacbc43ff77fceb651bab6d409b1b0

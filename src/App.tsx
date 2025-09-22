@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -44,7 +44,7 @@ const App = () => (
 );
 
 export default App;
-=======
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -90,4 +90,4 @@ const App = () => (
 );
 
 export default App;
->>>>>>> 362b52b683dacbc43ff77fceb651bab6d409b1b0
+
