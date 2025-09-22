@@ -2,6 +2,7 @@ import google.generativeai as genai
 from typing import Dict, Any, List, Optional
 import json
 import logging
+import google.generativeai as genai  # type: ignore
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -9,8 +10,8 @@ logger = logging.getLogger(__name__)
 class GeminiAIService:
     def __init__(self):
         """Initialize Gemini AI service with API key."""
-        genai.configure(api_key=settings.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-pro')
+        genai.configure(api_key=settings.gemini_api_key)  # type: ignore
+        self.model = genai.GenerativeModel('gemini-pro')  # type: ignore
     
     async def analyze_marine_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze marine biodiversity data using Gemini AI."""
@@ -178,6 +179,62 @@ class GeminiAIService:
             if any(keyword in line.lower() for keyword in ['pattern', 'trend', 'distribution', 'correlation']):
                 patterns.append(line.strip())
         return patterns[:5]  # Return top 5 patterns
+
+    async def analyze_ecosystem_health(self, ecosystem_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze ecosystem health indicators using integrated marine data"""
+        try:
+            prompt = f"""
+            Analyze the following marine ecosystem data and provide comprehensive health assessment:
+            
+            Ecosystem Data: {json.dumps(ecosystem_data, indent=2)}
+            
+            Please provide:
+            1. Overall ecosystem health assessment (Excellent/Good/Fair/Poor)
+            2. Key health indicators analysis
+            3. Threat assessment and risk factors
+            4. Biodiversity status evaluation
+            5. Water quality implications
+            6. Climate change impacts
+            7. Conservation recommendations
+            8. Management strategies
+            9. Monitoring priorities
+            10. Research needs
+            
+            Focus on scientifically sound analysis based on marine ecology principles.
+            """
+            
+            response = self.model.generate_content(prompt)
+            
+            return {
+                "ecosystem_health_analysis": response.text,
+                "health_indicators": self._extract_health_indicators(response.text),
+                "recommendations": self._extract_recommendations(response.text),
+                "status": "success"
+            }
+        except Exception as e:
+            logger.error(f"Error analyzing ecosystem health: {str(e)}")
+            return {
+                "error": f"Ecosystem health analysis failed: {str(e)}",
+                "status": "error"
+            }
+    
+    def _extract_health_indicators(self, analysis_text: str) -> List[str]:
+        """Extract health indicators from analysis text."""
+        indicators = []
+        lines = analysis_text.split('\n')
+        for line in lines:
+            if any(keyword in line.lower() for keyword in ['indicator', 'health', 'status', 'condition']):
+                indicators.append(line.strip())
+        return indicators[:7]  # Return top 7 indicators
+    
+    def _extract_recommendations(self, analysis_text: str) -> List[str]:
+        """Extract recommendations from analysis text."""
+        recommendations = []
+        lines = analysis_text.split('\n')
+        for line in lines:
+            if any(keyword in line.lower() for keyword in ['recommend', 'suggest', 'should', 'action']):
+                recommendations.append(line.strip())
+        return recommendations[:10]  # Return top 10 recommendations
 
 # Global AI service instance
 ai_service = GeminiAIService()

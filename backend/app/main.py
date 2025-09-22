@@ -56,9 +56,13 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting up Marine Data Platform API...")
-    # Database table creation disabled for development
-    # Uncomment when database is properly configured:
-    # Base.metadata.create_all(bind=engine)
+    # Create database tables for unified marine data platform
+    try:
+        from app.models.marine_data import Base
+        Base.metadata.create_all(bind=engine)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Failed to create database tables: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_event():

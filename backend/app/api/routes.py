@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from app.api.v1 import biodiversity, oceanography, data_integration, analytics, ai
+from app.api.v1 import biodiversity, oceanography, fisheries, taxonomy, molecular, data_integration, analytics, ai
 
 api_router = APIRouter()
 
@@ -24,6 +24,24 @@ api_router.include_router(
     oceanography.router,
     prefix="/oceanography", 
     tags=["oceanography"]
+)
+
+api_router.include_router(
+    fisheries.router,
+    prefix="/fisheries",
+    tags=["fisheries"]
+)
+
+api_router.include_router(
+    taxonomy.router,
+    prefix="/taxonomy",
+    tags=["taxonomy"]
+)
+
+api_router.include_router(
+    molecular.router,
+    prefix="/molecular",
+    tags=["molecular-biology"]
 )
 
 api_router.include_router(
