@@ -1,0 +1,619 @@
+// Enhanced OBIS + Gemini API Integration Service - Direct OBIS API
+import { geminiApi } from './geminiApi';
+
+interface OBISSpeciesData {
+  scientificName?: string;
+  kingdom?: string;
+  phylum?: string;
+  class?: string;
+  order?: string;
+  family?: string;
+  genus?: string;
+  species?: string;
+  decimalLatitude?: number;
+  decimalLongitude?: number;
+  depth?: number;
+  minimumDepthInMeters?: number;
+  maximumDepthInMeters?: number;
+  eventDate?: string;
+  locality?: string;
+  country?: string;
+  individualCount?: number;
+  basisOfRecord?: string;
+  datasetName?: string;
+  institutionCode?: string;
+}
+
+interface OBISResponse {
+  total: number;
+  results: OBISSpeciesData[];
+  limit: number;
+  offset: number;
+}
+
+interface OBISDataset {
+  id: string;
+  title: string;
+  description?: string;
+  citation?: string;
+  license?: string;
+  records?: number;
+  extent?: {
+    spatial?: string;
+    temporal?: string;
+  };
+  abstract?: string;
+}
+
+interface EnhancedMarineAnalysis {
+  obis_data: OBISResponse | OBISDataset | { metadata: OBISDataset; occurrences: OBISResponse };
+  ai_analysis: string;
+  insights: {
+    species_diversity: string;
+    geographic_distribution: string;
+    conservation_status: string;
+    ecological_significance: string;
+    threats_and_recommendations: string;
+  };
+  summary: string;
+}
+
+class OBISGeminiService {
+  private obisBaseUrl = 'https://api.obis.org/v3';
+
+  // Direct OBIS API - Fetch list of available datasets
+  async fetchOBISDatasets(limit: number = 20, offset: number = 0): Promise<{ datasets: OBISDataset[], total: number }> {
+    try {
+      const response = await fetch(`${this.obisBaseUrl}/dataset?limit=${limit}&offset=${offset}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Datasets API error: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return {
+        datasets: data.results || [],
+        total: data.total || 0
+      };
+    } catch (error) {
+      console.error('Error fetching OBIS datasets:', error);
+      throw new Error(`Failed to fetch OBIS datasets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Direct OBIS API - Fetch statistics for visualization
+  async fetchOBISStatistics(): Promise<any> {
+    try {
+      const response = await fetch(`${this.obisBaseUrl}/statistics`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Statistics API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS statistics:', error);
+      throw new Error(`Failed to fetch OBIS statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  // Direct OBIS API - Fetch taxonomy data for analysis
+  async fetchOBISTaxonomy(scientificName?: string, rank?: string): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (scientificName) params.append('scientificname', scientificName);
+      if (rank) params.append('rank', rank);
+      
+      const response = await fetch(`${this.obisBaseUrl}/taxon?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Taxonomy API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS taxonomy:', error);
+      throw new Error(`Failed to fetch OBIS taxonomy: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async searchSpeciesWithAI(
+    scientificName?: string,
+    geometry?: string,
+    limit: number = 100
+  ): Promise<EnhancedMarineAnalysis> {
+    try {
+      // 1. Fetch data from OBIS API
+      const obisData = await this.fetchOBISSpecies(scientificName, geometry, limit);
+      
+      // 2. Analyze with Gemini AI
+      const aiAnalysis = await this.analyzeSpeciesDataWithAI(obisData, scientificName);
+      
+      // 3. Generate detailed insights
+      const insights = await this.generateDetailedInsights(obisData, scientificName);
+      
+      // 4. Create summary
+      const summary = await this.generateSummary(obisData, aiAnalysis, scientificName);
+      
+      return {
+        obis_data: obisData,
+        ai_analysis: aiAnalysis,
+        insights,
+        summary
+      };
+    } catch (error) {
+      console.error('Error in species analysis:', error);
+      throw new Error(`Species analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async analyzeDatasetWithAI(datasetId: string): Promise<EnhancedMarineAnalysis> {
+    try {
+      // 1. Fetch dataset metadata from OBIS
+      const datasetMetadata = await this.fetchOBISDataset(datasetId);
+      
+      // 2. Fetch actual occurrence records from this dataset
+      const occurrenceData = await this.fetchOBISSpecies(undefined, undefined, 100, datasetId);
+      
+      // 3. Combine metadata with actual data for analysis
+      const combinedData = {
+        ...datasetMetadata,
+        occurrence_data: occurrenceData,
+        total_records: occurrenceData.total,
+        sample_records: occurrenceData.results
+      };
+      
+      // 4. Analyze dataset with AI using real occurrence data
+      const aiAnalysis = await this.analyzeDatasetWithOccurrences(datasetMetadata, occurrenceData);
+      
+      // 5. Generate insights for dataset with real data
+      const insights = await this.generateDatasetInsights(combinedData);
+      
+      // 6. Create summary
+      const summary = await this.generateDatasetSummary(combinedData, aiAnalysis);
+      
+      return {
+        obis_data: occurrenceData, // Return the occurrence data for the UI
+        ai_analysis: aiAnalysis,
+        insights,
+        summary
+      };
+    } catch (error) {
+      console.error('Error in dataset analysis:', error);
+      throw new Error(`Dataset analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  async getMarineInsightsForRegion(
+    geometry: string,
+    description?: string
+  ): Promise<string> {
+    try {
+      // 1. Get species data for the region
+      const regionData = await this.fetchOBISSpecies(undefined, geometry, 50);
+      
+      // 2. Get region-specific insights from AI
+      const prompt = `Analyze this marine biodiversity data for a specific region:
+
+Region: ${description || 'Specified coordinates'}
+Geometry: ${geometry}
+Species data: ${JSON.stringify(regionData, null, 2)}
+
+Please provide comprehensive insights about:
+1. Biodiversity patterns in this region
+2. Key species and their ecological roles
+3. Environmental conditions and habitat characteristics
+4. Conservation priorities and threats
+5. Research opportunities and data gaps
+6. Comparison with global marine biodiversity patterns
+
+Format your response as a detailed scientific analysis suitable for researchers and conservationists.`;
+
+      return await geminiApi.generateContent(prompt);
+    } catch (error) {
+      console.error('Error getting regional insights:', error);
+      throw new Error(`Regional analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  private async fetchOBISSpecies(
+    scientificName?: string,
+    geometry?: string,
+    limit: number = 100,
+    datasetId?: string
+  ): Promise<OBISResponse> {
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      offset: '0'
+    });
+
+    if (scientificName) {
+      params.append('scientificname', scientificName);
+    }
+    if (geometry) {
+      params.append('geometry', geometry);
+    }
+    if (datasetId) {
+      params.append('datasetid', datasetId);
+    }
+
+    const response = await fetch(`${this.obisBaseUrl}/occurrence?${params}`);
+    
+    if (!response.ok) {
+      throw new Error(`OBIS API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  private async fetchOBISDataset(datasetId: string): Promise<OBISDataset> {
+    const response = await fetch(`${this.obisBaseUrl}/dataset/${datasetId}`);
+    
+    if (!response.ok) {
+      throw new Error(`OBIS Dataset API error: ${response.status} ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  private async analyzeSpeciesDataWithAI(
+    data: OBISResponse,
+    scientificName?: string
+  ): Promise<string> {
+    const prompt = `As a marine biology expert, analyze this OBIS species occurrence data:
+
+Query: ${scientificName || 'General marine species search'}
+Total records: ${data.total}
+Retrieved records: ${data.results.length}
+
+Sample data:
+${JSON.stringify(data.results.slice(0, 5), null, 2)}
+
+Please provide a comprehensive analysis covering:
+1. Species diversity and abundance patterns
+2. Geographic distribution analysis
+3. Depth and habitat preferences
+4. Temporal patterns (if available)
+5. Data quality assessment
+6. Ecological implications
+7. Conservation considerations
+
+Focus on scientifically accurate insights that would be valuable for marine researchers and conservationists.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  private async analyzeDatasetDataWithAI(dataset: OBISDataset): Promise<string> {
+    const prompt = `Analyze this OBIS dataset as a marine biology expert:
+
+Dataset: ${dataset.title}
+ID: ${dataset.id}
+Description: ${dataset.description || 'No description available'}
+Records: ${dataset.records || 'Unknown'}
+Spatial extent: ${dataset.extent?.spatial || 'Not specified'}
+Temporal extent: ${dataset.extent?.temporal || 'Not specified'}
+
+Please provide analysis on:
+1. Scientific significance of this dataset
+2. Geographic and temporal coverage
+3. Species coverage and taxonomic scope
+4. Research applications and value
+5. Data quality and completeness assessment
+6. Integration opportunities with other datasets
+7. Conservation and management implications
+
+Provide insights suitable for marine researchers and data managers.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  // New method to analyze dataset WITH actual occurrence data
+  private async analyzeDatasetWithOccurrences(dataset: OBISDataset, occurrences: OBISResponse): Promise<string> {
+    const prompt = `Analyze this OBIS dataset with actual occurrence data as a marine biology expert:
+
+**Dataset Metadata:**
+Title: ${dataset.title}
+ID: ${dataset.id}
+Description: ${dataset.description || 'No description available'}
+Total Records: ${dataset.records || 'Unknown'}
+Spatial extent: ${dataset.extent?.spatial || 'Not specified'}
+Temporal extent: ${dataset.extent?.temporal || 'Not specified'}
+
+**Actual Occurrence Data Sample (${occurrences.results.length} of ${occurrences.total} records):**
+${JSON.stringify(occurrences.results.slice(0, 10), null, 2)}
+
+**Analysis Instructions:**
+Now that you have REAL occurrence data, please provide comprehensive analysis on:
+
+1. **Species Diversity Analysis:**
+   - Taxonomic composition from actual records
+   - Species abundance patterns
+   - Biodiversity metrics based on real data
+
+2. **Geographic Distribution Patterns:**
+   - Spatial distribution from coordinates
+   - Depth ranges and habitat preferences
+   - Geographic hotspots and gaps
+
+3. **Temporal Patterns:**
+   - Seasonal occurrence patterns
+   - Long-term trends if applicable
+   - Data collection timeline
+
+4. **Data Quality Assessment:**
+   - Completeness of taxonomic identification
+   - Geographic precision and accuracy
+   - Temporal coverage and gaps
+
+5. **Ecological Insights:**
+   - Community structure analysis
+   - Habitat associations
+   - Environmental correlations
+
+6. **Conservation Implications:**
+   - Threatened species presence
+   - Protected area coverage
+   - Conservation priorities
+
+7. **Research Applications:**
+   - Specific research questions this data can address
+   - Integration opportunities with other datasets
+   - Future research directions
+
+Provide scientifically rigorous insights based on the ACTUAL DATA rather than general speculation.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  private async generateDetailedInsights(
+    data: OBISResponse,
+    scientificName?: string
+  ): Promise<EnhancedMarineAnalysis['insights']> {
+    const species_diversity = await geminiApi.generateContent(
+      `Analyze species diversity patterns from this OBIS data: ${JSON.stringify(data.results.slice(0, 10), null, 2)}. Focus on taxonomic diversity, abundance patterns, and biodiversity metrics.`
+    );
+
+    const geographic_distribution = await geminiApi.generateContent(
+      `Analyze geographic distribution patterns from this OBIS data: ${JSON.stringify(data.results.slice(0, 10), null, 2)}. Focus on spatial patterns, biogeographic regions, and habitat preferences.`
+    );
+
+    const conservation_status = await geminiApi.generateContent(
+      `Assess conservation implications from this OBIS data: ${JSON.stringify(data.results.slice(0, 10), null, 2)}. Focus on conservation status, threats, and protection needs.`
+    );
+
+    const ecological_significance = await geminiApi.generateContent(
+      `Explain ecological significance from this OBIS data: ${JSON.stringify(data.results.slice(0, 10), null, 2)}. Focus on ecosystem roles, food web interactions, and ecological importance.`
+    );
+
+    const threats_and_recommendations = await geminiApi.generateContent(
+      `Identify threats and provide recommendations based on this OBIS data: ${JSON.stringify(data.results.slice(0, 10), null, 2)}. Focus on current threats, future risks, and actionable conservation recommendations.`
+    );
+
+    return {
+      species_diversity,
+      geographic_distribution,
+      conservation_status,
+      ecological_significance,
+      threats_and_recommendations
+    };
+  }
+
+  private async generateDatasetInsights(dataset: OBISDataset): Promise<EnhancedMarineAnalysis['insights']> {
+    const basePrompt = `Dataset: ${dataset.title} (${dataset.records} records)`;
+    
+    return {
+      species_diversity: await geminiApi.generateContent(`${basePrompt} - Analyze expected species diversity patterns and taxonomic coverage.`),
+      geographic_distribution: await geminiApi.generateContent(`${basePrompt} - Analyze geographic coverage and spatial distribution patterns.`),
+      conservation_status: await geminiApi.generateContent(`${basePrompt} - Assess conservation value and implications.`),
+      ecological_significance: await geminiApi.generateContent(`${basePrompt} - Explain ecological significance and research value.`),
+      threats_and_recommendations: await geminiApi.generateContent(`${basePrompt} - Identify potential threats and research recommendations.`)
+    };
+  }
+
+  // Generate insights WITH actual occurrence data
+  private async generateDatasetInsightsWithOccurrences(dataset: OBISDataset, occurrences: OBISResponse): Promise<EnhancedMarineAnalysis['insights']> {
+    const baseData = `Dataset: ${dataset.title} (${dataset.records} records)\nSample occurrence data: ${JSON.stringify(occurrences.results.slice(0, 5), null, 2)}`;
+    
+    return {
+      species_diversity: await geminiApi.generateContent(`${baseData}\n\nAnalyze actual species diversity patterns based on the occurrence records. Focus on taxonomic composition, species richness, and abundance patterns.`),
+      geographic_distribution: await geminiApi.generateContent(`${baseData}\n\nAnalyze geographic distribution patterns from the actual coordinates and localities. Identify spatial hotspots, depth ranges, and habitat preferences.`),
+      conservation_status: await geminiApi.generateContent(`${baseData}\n\nAssess conservation implications based on actual species records. Identify any threatened species, protected area coverage, and conservation priorities.`),
+      ecological_significance: await geminiApi.generateContent(`${baseData}\n\nExplain ecological significance based on actual species composition and environmental data. Focus on ecosystem roles and ecological relationships.`),
+      threats_and_recommendations: await geminiApi.generateContent(`${baseData}\n\nIdentify threats and provide recommendations based on actual species distributions and habitat data. Include specific conservation actions.`)
+    };
+  }
+
+  private async generateSummary(
+    data: OBISResponse,
+    analysis: string,
+    scientificName?: string
+  ): Promise<string> {
+    const prompt = `Create a concise executive summary of this marine biodiversity analysis:
+
+Query: ${scientificName || 'Marine species search'}
+Records found: ${data.total}
+Analysis: ${analysis.substring(0, 500)}...
+
+Provide a 2-3 paragraph summary highlighting:
+1. Key findings about species and biodiversity
+2. Geographic and ecological patterns
+3. Most important conservation insights
+4. Main recommendations for action
+
+Keep it accessible for both scientists and policy makers.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  private async generateDatasetSummary(
+    dataset: any,
+    analysis: string
+  ): Promise<string> {
+    const hasOccurrenceData = dataset.sample_records && dataset.sample_records.length > 0;
+    
+    const prompt = `Create an executive summary for this OBIS dataset analysis:
+
+Dataset: ${dataset.title}
+Total Records: ${dataset.total_records || dataset.records}
+${hasOccurrenceData ? `Analyzed Records: ${dataset.sample_records.length}
+Species Found: ${new Set(dataset.sample_records.map((r: any) => r.scientificName).filter(Boolean)).size}
+` : ''}Analysis: ${analysis.substring(0, 500)}...
+
+Provide a 2-3 paragraph summary highlighting:
+1. Dataset scope and scientific value${hasOccurrenceData ? ' (based on actual data)' : ''}
+2. Key applications and research potential
+3. Conservation and management relevance
+4. Integration opportunities
+${hasOccurrenceData ? '5. Key findings from occurrence data analysis' : ''}
+
+Target audience: marine researchers and data managers.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  // Generate summary WITH actual occurrence data
+  private async generateDatasetSummaryWithOccurrences(
+    dataset: OBISDataset,
+    occurrences: OBISResponse,
+    analysis: string
+  ): Promise<string> {
+    const prompt = `Create an executive summary for this OBIS dataset analysis with real occurrence data:
+
+Dataset: ${dataset.title}
+Total Records: ${dataset.records}
+Analyzed Records: ${occurrences.results.length} of ${occurrences.total}
+Key Species Found: ${[...new Set(occurrences.results.map(r => r.scientificName).filter(Boolean))].slice(0, 5).join(', ')}
+Analysis: ${analysis.substring(0, 500)}...
+
+Provide a 2-3 paragraph summary highlighting:
+1. Dataset scope and actual biodiversity content
+2. Key species and ecological findings from real data
+3. Geographic distribution and habitat insights
+4. Conservation implications and research applications
+5. Data quality and completeness assessment
+
+Target audience: marine researchers and conservation managers.`;
+
+    return await geminiApi.generateContent(prompt);
+  }
+
+  // Helper method for quick species lookup with AI insights
+  async quickSpeciesLookup(scientificName: string): Promise<string> {
+    try {
+      const data = await this.fetchOBISSpecies(scientificName, undefined, 20);
+      
+      if (data.total === 0) {
+        return await geminiApi.generateContent(`No OBIS records found for "${scientificName}". Please provide general information about this species, including habitat, distribution, conservation status, and ecological importance.`);
+      }
+
+      const prompt = `Quick analysis for ${scientificName}:
+Found ${data.total} records in OBIS database.
+Sample data: ${JSON.stringify(data.results.slice(0, 3), null, 2)}
+
+Provide a brief (3-4 sentences) summary covering:
+- Current distribution based on OBIS data
+- Habitat preferences
+- Conservation significance
+- Key ecological role`;
+
+      return await geminiApi.generateContent(prompt);
+    } catch (error) {
+      console.error('Error in quick species lookup:', error);
+      throw new Error(`Species lookup failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+}
+
+export const obisGeminiService = new OBISGeminiService();
+
+// Additional methods for real OBIS data integration
+export const obisDataService = {
+  // Fetch real OBIS datasets
+  async fetchOBISDatasets(limit: number = 20, offset: number = 0): Promise<{ results: any[], total: number }> {
+    try {
+      const response = await fetch(`https://api.obis.org/v3/dataset?limit=${limit}&offset=${offset}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Dataset API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS datasets:', error);
+      throw new Error(`Failed to fetch datasets: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get statistics for visualization
+  async getOBISStats(): Promise<any> {
+    try {
+      const response = await fetch(`https://api.obis.org/v3/statistics`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Statistics API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching OBIS statistics:', error);
+      throw new Error(`Failed to fetch statistics: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get species occurrence data for charts
+  async getSpeciesOccurrenceData(params: {
+    scientificName?: string;
+    startDate?: string;
+    endDate?: string;
+    geometry?: string;
+    limit?: number;
+  }): Promise<any> {
+    try {
+      const urlParams = new URLSearchParams({
+        limit: (params.limit || 100).toString(),
+        offset: '0'
+      });
+
+      if (params.scientificName) urlParams.append('scientificname', params.scientificName);
+      if (params.startDate) urlParams.append('startdate', params.startDate);
+      if (params.endDate) urlParams.append('enddate', params.endDate);
+      if (params.geometry) urlParams.append('geometry', params.geometry);
+
+      const response = await fetch(`https://api.obis.org/v3/occurrence?${urlParams}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching species occurrence data:', error);
+      throw new Error(`Failed to fetch occurrence data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  },
+
+  // Get taxa (taxonomic) data for diversity analysis
+  async getTaxaData(geometry?: string, limit: number = 100): Promise<any> {
+    try {
+      const params = new URLSearchParams({
+        limit: limit.toString(),
+        offset: '0'
+      });
+
+      if (geometry) {
+        params.append('geometry', geometry);
+      }
+
+      const response = await fetch(`https://api.obis.org/v3/taxon?${params}`);
+      
+      if (!response.ok) {
+        throw new Error(`OBIS Taxa API error: ${response.status} ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching taxa data:', error);
+      throw new Error(`Failed to fetch taxa data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+};
