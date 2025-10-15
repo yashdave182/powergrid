@@ -1,0 +1,17 @@
+# Streamlit Cloud configuration file
+
+[build]
+# Specify the Python version
+python_version = "3.9"
+
+# Specify the setup commands
+setup_commands = [
+    "pip install -r requirements_streamlit.txt"
+]
+
+[deploy]
+# Specify the main file
+main_script = "streamlit_app.py"
+
+# Specify the requirements file
+requirements = "requirements_streamlit.txt"

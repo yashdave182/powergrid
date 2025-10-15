@@ -2,15 +2,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import sys
 import os
 import json
-import matplotlib.pyplot as plt
-from datetime import datetime, timedelta
-import traceback
+from datetime import date, datetime
 
 # Add parent directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -47,12 +42,6 @@ def safe_import():
     try:
         from data.powergrid_preprocessing import PowerGridPreprocessor
         imports['PowerGridPreprocessor'] = PowerGridPreprocessor
-    except SyntaxError as e:
-        if "null bytes" in str(e):
-            errors.append("PowerGridPreprocessor: File contains null bytes - file corruption detected")
-        else:
-            errors.append(f"PowerGridPreprocessor: {str(e)}")
-        imports['PowerGridPreprocessor'] = None
     except Exception as e:
         errors.append(f"PowerGridPreprocessor: {str(e)}")
         imports['PowerGridPreprocessor'] = None
@@ -97,21 +86,6 @@ st.markdown("""
     .low-risk {
         color: #2ca02c;
         font-weight: bold;
-    }
-    .sidebar .sidebar-content {
-        background-color: #f8f9fa;
-        border-right: 1px solid #ddd;
-    }
-    .stButton > button {
-        background-color: #007bff;
-        color: white;
-        border-radius: 5px;
-        padding: 10px 20px;
-        font-size: 16px;
-        border: none;
-    }
-    .stButton > button:hover {
-        background-color: #0056b3;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -184,15 +158,6 @@ def load_data():
             data_path = 'data/processed/processed_data.csv'
         
         df = pd.read_csv(data_path)
-        
-        # Date features
-        if 'start_date' in df.columns:
-            df['start_date'] = pd.to_datetime(df['start_date'], errors='coerce')
-            df['start_year'] = df['start_date'].dt.year
-            df['start_month'] = df['start_date'].dt.month
-            df['start_quarter'] = df['start_date'].dt.quarter
-            df['is_monsoon_start'] = df['start_month'].apply(lambda x: 1 if x in [6,7,8,9] else 0)
-        
         return df
     except FileNotFoundError:
         st.error("⚠️ Data file not found. Please ensure processed_data.csv exists in data/processed/")
@@ -205,6 +170,13 @@ def load_data():
 def main():
     # Header
     st.markdown('<div class="main-header">🔌 POWERGRID Project Analytics Dashboard</div>', unsafe_allow_html=True)
+    
+    # Show import errors if any
+    if IMPORT_ERRORS:
+        with st.expander("⚠️ Import Warnings", expanded=False):
+            st.warning("Some modules failed to import. Some features may not work correctly.")
+            for error in IMPORT_ERRORS:
+                st.code(error)
     
     # Sidebar
     st.sidebar.title("Navigation")
@@ -270,73 +242,8 @@ def show_overview():
         
         st.divider()
         
-        # Charts
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'terrain_difficulty_score' in df.columns:
-                fig = px.histogram(
-                    df,
-                    x='terrain_difficulty_score',
-                    title='Terrain Difficulty Distribution',
-                    nbins=20,
-                    color_discrete_sequence=['#1f77b4']
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Terrain difficulty data not available")
-        
-        with col2:
-            if 'length_km' in df.columns:
-                fig = px.histogram(
-                    df,
-                    x='length_km',
-                    title='Project Length Distribution (km)',
-                    nbins=20,
-                    color_discrete_sequence=['#ff7f0e']
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Project length data not available")
-        
-        st.divider()
-        
-        # Additional charts
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'voltage_level_kv' in df.columns:
-                fig = px.box(
-                    df,
-                    y='voltage_level_kv',
-                    title='Voltage Level Distribution (kV)',
-                    color_discrete_sequence=['#2ca02c']
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            if 'num_towers' in df.columns:
-                fig = px.box(
-                    df,
-                    y='num_towers',
-                    title='Number of Towers Distribution',
-                    color_discrete_sequence=['#d62728']
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        st.divider()
-        
-        # Data summary
-        st.subheader("📋 Data Summary")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Dataset Rows", df.shape[0])
-        with col2:
-            st.metric("Total Features", len(df.columns))
-        with col3:
-            st.metric("Numerical Features", len(df.select_dtypes(include=[np.number]).columns))
-        
         # Show sample data
+        st.subheader("📋 Sample Data")
         with st.expander("View Sample Data"):
             st.dataframe(df.head(10))
         
@@ -402,15 +309,17 @@ def show_single_prediction():
         # Prepare input data
         # Handle date properly - st.date_input can return different types
         try:
-            if hasattr(start_date, '__iter__') and not isinstance(start_date, str):
-                # If it's iterable (tuple, list), take the first element
-                date_obj = list(start_date)[0] if len(list(start_date)) > 0 else datetime.now().date()
+            # Convert start_date to string format
+            if isinstance(start_date, date):
+                # Single date
+                start_date_str = start_date.strftime('%Y-%m-%d')
+            elif isinstance(start_date, tuple) and len(start_date) > 0:
+                # Tuple of dates, take the first one
+                start_date_str = start_date[0].strftime('%Y-%m-%d')
             else:
-                # If it's a single date or other type
-                date_obj = start_date if hasattr(start_date, 'strftime') else datetime.now().date()
-            
-            start_date_str = date_obj.strftime('%Y-%m-%d')
-        except:
+                # Fallback to current date
+                start_date_str = datetime.now().strftime('%Y-%m-%d')
+        except Exception:
             # Fallback to current date if anything goes wrong
             start_date_str = datetime.now().strftime('%Y-%m-%d')
         
@@ -551,34 +460,6 @@ def show_single_prediction():
                 
                 st.divider()
                 
-                # Domain-specific analysis
-                if st.session_state.get('preprocessor'):
-                    st.subheader("🔧 Domain-Specific Analysis")
-                    
-                    try:
-                        domain_features = st.session_state.preprocessor.create_domain_specific_features(project_data)
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            st.write("**Key Domain Features:**")
-                            for key in ['project_type_encoded', 'terrain_risk_score', 'cost_intensity_per_km', 'timeline_pressure_score']:
-                                if key in domain_features:
-                                    st.info(f"{key.replace('_', ' ').title()}: {domain_features[key]:.2f}")
-                        
-                        with col2:
-                            st.write("**Risk Factors:**")
-                            for key in ['weather_impact_score', 'vendor_risk_score', 'regulatory_complexity_score', 'resource_availability_score']:
-                                if key in domain_features:
-                                    value = domain_features[key]
-                                    risk_level = "High" if value > 0.7 else "Medium" if value > 0.4 else "Low"
-                                    st.info(f"{key.replace('_', ' ').title()}: {risk_level}")
-                    
-                    except:
-                        pass
-                
-                st.divider()
-                
                 # Recommendations
                 st.subheader("💡 Recommendations")
                 risk_cat = predictions.get('risk_category', 'Medium')
@@ -675,37 +556,12 @@ def show_batch_analysis():
                     avg_time = pred_df['time_overrun_percentage'].mean()
                     st.metric("Avg Time Overrun", f"{avg_time:.1f}%")
             
-            # Visualizations
-            st.subheader("📊 Analysis Charts")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if 'risk_category' in pred_df.columns:
-                    risk_counts = pred_df['risk_category'].value_counts()
-                    fig = px.pie(
-                        values=risk_counts.values,
-                        names=risk_counts.index,
-                        title='Risk Category Distribution',
-                        hole=0.4
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                if 'cost_overrun_percentage' in pred_df.columns:
-                    fig = px.histogram(
-                        pred_df,
-                        x='cost_overrun_percentage',
-                        title='Cost Overrun Distribution',
-                        nbins=20
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            
             # Download results
             csv = pred_df.to_csv(index=False)
             st.download_button(
                 label="📥 Download Predictions CSV",
                 data=csv,
-                file_name=f"batch_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                file_name=f"batch_predictions_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
             
@@ -731,50 +587,18 @@ def show_risk_hotspots():
         col1, col2 = st.columns(2)
         
         with col1:
-            fig = px.pie(
-                values=cluster_counts.values,
-                names=cluster_counts.index,
-                title='Project Distribution by Cluster',
-                hole=0.4
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.write("**Cluster Distribution:**")
+            st.dataframe(cluster_counts)
         
         with col2:
-            fig = px.bar(
-                x=cluster_counts.index,
-                y=cluster_counts.values,
-                title='Projects per Cluster',
-                labels={'x': 'Cluster', 'y': 'Number of Projects'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.write("**Cluster Summary:**")
+            st.write(f"Total clusters: {len(cluster_counts)}")
+            st.write(f"Largest cluster: {cluster_counts.idxmax()} ({cluster_counts.max()} projects)")
+            st.write(f"Smallest cluster: {cluster_counts.idxmin()} ({cluster_counts.min()} projects)")
         
         st.divider()
-        
-        # Cluster statistics
-        st.subheader("🔍 Cluster Details")
-        
-        numeric_cols = cluster_data.select_dtypes(include=[np.number]).columns
-        numeric_cols = [col for col in numeric_cols if col != 'cluster']
-        
-        if numeric_cols:
-            cluster_stats = cluster_data.groupby('cluster')[numeric_cols].mean().round(2)
-            st.dataframe(cluster_stats)
-        
-        # Hotspot visualization
-        st.divider()
-        st.subheader("🗺️ Hotspot Visualization")
-        
-        img_path = os.path.join(parent_dir, 'outputs', 'hotspot_clusters.png')
-        if not os.path.exists(img_path):
-            img_path = 'outputs/hotspot_clusters.png'
-        
-        if os.path.exists(img_path):
-            st.image(img_path, caption='Project Risk Hotspots Clustering', use_column_width=True)
-        else:
-            st.info("Cluster visualization image not found")
         
         # Risk assessment
-        st.divider()
         st.subheader("⚠️ Risk Assessment by Cluster")
         
         for cluster_id in sorted(cluster_data['cluster'].unique()):
@@ -901,34 +725,6 @@ def show_enhanced_hotspot_analysis():
         
         st.divider()
         
-        # Visualizations
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if all(col in df.columns for col in ['length_km', 'voltage_level_kv', 'hotspot_score']):
-                fig = px.scatter_3d(
-                    df,
-                    x='length_km',
-                    y='voltage_level_kv',
-                    z='hotspot_score',
-                    color='cluster',
-                    size='hotspot_score',
-                    title='3D Hotspot Visualization'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            fig = px.histogram(
-                df,
-                x='hotspot_score',
-                nbins=20,
-                title='Hotspot Score Distribution',
-                color='cluster'
-            )
-            st.plotly_chart(fig, use_container_width=True)
-        
-        st.divider()
-        
         # Risk categorization
         st.subheader("🎯 Risk Categorization")
         
@@ -942,35 +738,28 @@ def show_enhanced_hotspot_analysis():
         
         with col1:
             risk_summary = df['risk_level'].value_counts()
-            fig = px.pie(
-                values=risk_summary.values,
-                names=risk_summary.index,
-                title='Project Risk Distribution',
-                hole=0.4
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.write("**Risk Distribution:**")
+            st.dataframe(risk_summary)
         
         with col2:
             risk_cluster = pd.crosstab(df['cluster'], df['risk_level'])
-            fig = px.bar(
-                risk_cluster,
-                title='Risk Level by Cluster',
-                barmode='group'
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.write("**Risk Level by Cluster:**")
+            st.dataframe(risk_cluster)
         
         st.divider()
         
         # High priority projects
         st.subheader("🚨 High Priority Projects")
-        high_risk = df[df['hotspot_score'] > 0.7].sort_values('hotspot_score', ascending=False)
+        high_risk_filter = df[df['hotspot_score'] > 0.7]
+        # Convert to DataFrame to ensure it has DataFrame methods
+        high_risk = pd.DataFrame(high_risk_filter)
         
         if len(high_risk) > 0:
             display_cols = ['project_id', 'hotspot_score', 'recommendation'] if 'project_id' in high_risk.columns else ['hotspot_score', 'recommendation']
             st.dataframe(high_risk[display_cols].head(10))
         else:
             st.success("No high-risk projects detected!")
-        
+
         # Export
         st.divider()
         export_cols = ['project_id', 'cluster', 'hotspot_score', 'anomaly_score', 'risk_level', 'recommendation'] if 'project_id' in df.columns else ['cluster', 'hotspot_score', 'anomaly_score', 'risk_level', 'recommendation']
@@ -980,7 +769,7 @@ def show_enhanced_hotspot_analysis():
         st.download_button(
             label="📥 Download Hotspot Analysis",
             data=csv,
-            file_name=f"hotspot_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            file_name=f"hotspot_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
             mime="text/csv"
         )
         
@@ -1007,54 +796,12 @@ def show_model_performance():
             st.subheader("💰 Cost Prediction Models")
             cost_df = pd.DataFrame(metrics['cost_models']).T.round(4)
             st.dataframe(cost_df)
-            
-            if not cost_df.empty and 'MAE' in cost_df.columns and 'R2' in cost_df.columns:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    fig = px.bar(
-                        x=cost_df.index,
-                        y=cost_df['MAE'],
-                        title='Cost Model - Mean Absolute Error',
-                        labels={'x': 'Model', 'y': 'MAE'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    fig = px.bar(
-                        x=cost_df.index,
-                        y=cost_df['R2'],
-                        title='Cost Model - R² Score',
-                        labels={'x': 'Model', 'y': 'R² Score'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
         
         # Time models
         if 'time_models' in metrics:
             st.subheader("⏱️ Time Prediction Models")
             time_df = pd.DataFrame(metrics['time_models']).T.round(4)
             st.dataframe(time_df)
-            
-            if not time_df.empty and 'MAE' in time_df.columns and 'R2' in time_df.columns:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    fig = px.bar(
-                        x=time_df.index,
-                        y=time_df['MAE'],
-                        title='Time Model - Mean Absolute Error',
-                        labels={'x': 'Model', 'y': 'MAE'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    fig = px.bar(
-                        x=time_df.index,
-                        y=time_df['R2'],
-                        title='Time Model - R² Score',
-                        labels={'x': 'Model', 'y': 'R² Score'}
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
         
         # Overall summary
         st.subheader("📈 Overall Performance Summary")
@@ -1079,49 +826,6 @@ def show_model_performance():
                 st.metric("Best Time Model", best_time)
             with col4:
                 st.metric("Best Time R²", f"{best_time_r2:.4f}")
-        
-        # Feature importance
-        try:
-            feature_importance_path = os.path.join(parent_dir, 'models', 'feature_importance.json')
-            if not os.path.exists(feature_importance_path):
-                feature_importance_path = 'models/feature_importance.json'
-            
-            with open(feature_importance_path, 'r') as f:
-                feature_importance = json.load(f)
-            
-            st.subheader("🔍 Feature Importance")
-            
-            if 'cost_features' in feature_importance:
-                st.write("**Cost Prediction - Top Features:**")
-                cost_features = pd.DataFrame(list(feature_importance['cost_features'].items()), 
-                                           columns=['Feature', 'Importance'])
-                cost_features = cost_features.sort_values('Importance', ascending=False).head(10)
-                
-                fig = px.bar(
-                    data_frame=cost_features,
-                    x='Importance',
-                    y='Feature',
-                    orientation='h',
-                    title='Top 10 Features for Cost Prediction'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            
-            if 'time_features' in feature_importance:
-                st.write("**Time Prediction - Top Features:**")
-                time_features = pd.DataFrame(list(feature_importance['time_features'].items()), 
-                                           columns=['Feature', 'Importance'])
-                time_features = time_features.sort_values('Importance', ascending=False).head(10)
-                
-                fig = px.bar(
-                    data_frame=time_features,
-                    x='Importance',
-                    y='Feature',
-                    orientation='h',
-                    title='Top 10 Features for Time Prediction'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        except:
-            pass
         
     except FileNotFoundError:
         st.error("Model metrics file not found. Please train models first.")

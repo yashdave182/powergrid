@@ -8,7 +8,7 @@ import os
 import streamlit as st
 
 # Add src to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 def main():
     """Main application entry point"""
@@ -48,10 +48,22 @@ joblib==1.3.1
 matplotlib==3.7.2
 seaborn==0.12.2
 python-dotenv==1.0.0
+pyyaml==6.0.1
 """)
+        
+        # Try to show basic info
+        st.subheader("System Info")
+        st.write(f"Python version: {sys.version}")
+        st.write(f"Working directory: {os.getcwd()}")
+        st.write(f"sys.path: {sys.path}")
+        
     except Exception as e:
         st.error(f"An error occurred while running the app: {str(e)}")
         st.info("Please check the console for more details.")
+        
+        # Show traceback for debugging
+        import traceback
+        st.code(traceback.format_exc())
 
 if __name__ == "__main__":
     main()

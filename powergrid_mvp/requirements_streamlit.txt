@@ -1,4 +1,6 @@
-# Core dependencies for Streamlit Cloud deployment
+# Simplified requirements for Streamlit Cloud deployment
+# Using pre-compiled wheels to avoid build issues
+
 streamlit==1.25.0
 pandas==2.0.3
 numpy==1.24.3
@@ -10,4 +12,4 @@ joblib==1.3.1
 matplotlib==3.7.2
 seaborn==0.12.2
 python-dotenv==1.0.0
-pyyaml==6.0
+pyyaml==6.0.1
