@@ -1,0 +1,3 @@
+@echo off
+echo Starting POWERGRID Project Prediction Dashboard...
+streamlit run src/dashboard/app.py

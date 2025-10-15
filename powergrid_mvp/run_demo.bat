@@ -1,0 +1,3 @@
+@echo off
+echo Starting POWERGRID Project Prediction Demo...
+python demo.py

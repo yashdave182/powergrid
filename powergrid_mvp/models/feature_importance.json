@@ -1,0 +1,82 @@
+[
+  {
+    "feature": "vendor_quality_score",
+    "importance": 0.21337050199508667
+  },
+  {
+    "feature": "vendor_reliability_score",
+    "importance": 0.07649499177932739
+  },
+  {
+    "feature": "terrain_difficulty_score",
+    "importance": 0.07427386939525604
+  },
+  {
+    "feature": "terrain_type_encoded",
+    "importance": 0.054364271461963654
+  },
+  {
+    "feature": "complexity_terrain_interaction",
+    "importance": 0.0533105693757534
+  },
+  {
+    "feature": "labor_to_total_cost_ratio",
+    "importance": 0.041999880224466324
+  },
+  {
+    "feature": "duration_per_km",
+    "importance": 0.03460012003779411
+  },
+  {
+    "feature": "weather_terrain_interaction",
+    "importance": 0.03308746963739395
+  },
+  {
+    "feature": "regulatory_delay_days",
+    "importance": 0.02870270237326622
+  },
+  {
+    "feature": "weather_impact_ratio",
+    "importance": 0.028463441878557205
+  },
+  {
+    "feature": "material_to_total_cost_ratio",
+    "importance": 0.027890143916010857
+  },
+  {
+    "feature": "adverse_weather_days",
+    "importance": 0.026448100805282593
+  },
+  {
+    "feature": "region_encoded",
+    "importance": 0.0245183315128088
+  },
+  {
+    "feature": "total_copper_tons",
+    "importance": 0.02124544233083725
+  },
+  {
+    "feature": "manpower_intensity",
+    "importance": 0.017717542126774788
+  },
+  {
+    "feature": "total_steel_tons",
+    "importance": 0.016956422477960587
+  },
+  {
+    "feature": "environmental_clearance_days",
+    "importance": 0.016568297520279884
+  },
+  {
+    "feature": "vendor_on_time_rate",
+    "importance": 0.015972429886460304
+  },
+  {
+    "feature": "estimated_manpower",
+    "importance": 0.015939859673380852
+  },
+  {
+    "feature": "num_towers",
+    "importance": 0.015398543328046799
+  }
+]

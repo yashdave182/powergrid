@@ -1,0 +1,3 @@
+@echo off
+echo Starting POWERGRID Project Prediction API...
+uvicorn src.api.main:app --reload --port 8000
