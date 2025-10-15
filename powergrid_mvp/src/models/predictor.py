@@ -75,17 +75,22 @@ class ProjectPredictor:
             df['is_monsoon_start'] = df['start_month'].apply(lambda x: 1 if x in [6,7,8,9] else 0)
         
         # Encode categoricals
-        for col, encoder in self.preprocessor['label_encoders'].items():
-            if col in df.columns:
-                df[f'{col}_encoded'] = encoder.transform(df[col].astype(str))
+        if self.preprocessor and 'label_encoders' in self.preprocessor:
+            for col, encoder in self.preprocessor['label_encoders'].items():
+                if col in df.columns:
+                    df[f'{col}_encoded'] = encoder.transform(df[col].astype(str))
         
         # Select features
         X = df[self.feature_names].fillna(0)
         
         # Scale
-        X_scaled = self.preprocessor['scaler'].transform(X)
-        
-        return X_scaled
+        if self.preprocessor and 'scaler' in self.preprocessor:
+            X_scaled = self.preprocessor['scaler'].transform(X)
+        else:
+            X_scaled = X.values
+            
+        # Ensure we return a numpy array
+        return np.array(X_scaled)
     
     def predict(self, project_data: Dict) -> Dict:
         """Make prediction for a single project"""

@@ -140,6 +140,12 @@ def initialize_models():
             # Initialize ML model
             if IMPORTS['PowerGridMLModel']:
                 st.session_state.powergrid_ml = IMPORTS['PowerGridMLModel']()
+                # Load the trained models for PowerGridMLModel
+                try:
+                    st.session_state.powergrid_ml.load_models()
+                except Exception as e:
+                    st.warning(f"Could not load PowerGridMLModel: {str(e)}")
+                    st.session_state.powergrid_ml = None
             else:
                 st.session_state.powergrid_ml = None
             
@@ -208,8 +214,7 @@ def main():
         "📈 Batch Analysis",
         "🔍 Risk Hotspots",
         "⚡ Enhanced Hotspot Analysis",
-        "📋 Model Performance",
-        "🔧 Advanced ML Analysis"
+        "📋 Model Performance"
     ])
     
     if page == "📊 Overview":
@@ -224,8 +229,6 @@ def main():
         show_enhanced_hotspot_analysis()
     elif page == "📋 Model Performance":
         show_model_performance()
-    elif page == "🔧 Advanced ML Analysis":
-        show_advanced_ml_analysis()
 
 def show_overview():
     """Overview dashboard"""
@@ -397,6 +400,20 @@ def show_single_prediction():
     
     if submitted:
         # Prepare input data
+        # Handle date properly - st.date_input can return different types
+        try:
+            if hasattr(start_date, '__iter__') and not isinstance(start_date, str):
+                # If it's iterable (tuple, list), take the first element
+                date_obj = list(start_date)[0] if len(list(start_date)) > 0 else datetime.now().date()
+            else:
+                # If it's a single date or other type
+                date_obj = start_date if hasattr(start_date, 'strftime') else datetime.now().date()
+            
+            start_date_str = date_obj.strftime('%Y-%m-%d')
+        except:
+            # Fallback to current date if anything goes wrong
+            start_date_str = datetime.now().strftime('%Y-%m-%d')
+        
         project_data = {
             'project_id': project_id,
             'length_km': length_km,
@@ -424,7 +441,7 @@ def show_single_prediction():
             'project_type': project_type,
             'region': region,
             'terrain_type': terrain_type,
-            'start_date': start_date.strftime('%Y-%m-%d')
+            'start_date': start_date_str
         }
         
         # Make predictions
@@ -438,13 +455,27 @@ def show_single_prediction():
                 
                 if st.session_state.get('powergrid_ml'):
                     try:
-                        enhanced_cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                            project_data, 'cost'
-                        )
-                        enhanced_time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                            project_data, 'time'
-                        )
-                    except:
+                        # Preprocess the data for the enhanced ML model
+                        if st.session_state.get('predictor') and hasattr(st.session_state.predictor, 'preprocess_input'):
+                            # Use the same preprocessing as the main predictor
+                            X_processed = st.session_state.predictor.preprocess_input(project_data)
+                            
+                            enhanced_cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                                X_processed, 'cost'
+                            )
+                            enhanced_time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                                X_processed, 'time'
+                            )
+                        else:
+                            # Fallback: try to use the raw data (may not work correctly)
+                            enhanced_cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                                project_data, 'cost'
+                            )
+                            enhanced_time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                                project_data, 'time'
+                            )
+                    except Exception as e:
+                        st.warning(f"Could not generate enhanced predictions: {str(e)}")
                         pass
                 
                 # Display results
@@ -471,8 +502,19 @@ def show_single_prediction():
                     st.metric("Cost Overrun", f"{predictions.get('cost_overrun_percentage', 0):.1f}%")
                     
                     if enhanced_cost_pred:
-                        st.info(f"Confidence: {enhanced_cost_pred.get('confidence', 0):.1%}")
-                        st.info(f"Uncertainty: ±₹{enhanced_cost_pred.get('uncertainty', 0):,.0f}")
+                        # Handle different return types from predict_with_uncertainty
+                        if isinstance(enhanced_cost_pred, dict):
+                            confidence = enhanced_cost_pred.get('confidence_level', 0.95)
+                            uncertainty_obj = enhanced_cost_pred.get('uncertainty', 0)
+                            # Handle both scalar and array returns
+                            if hasattr(uncertainty_obj, '__len__') and len(uncertainty_obj) > 0:
+                                uncertainty = uncertainty_obj[0] if isinstance(uncertainty_obj, (list, np.ndarray)) else uncertainty_obj
+                            else:
+                                uncertainty = uncertainty_obj
+                            st.info(f"Confidence: {confidence:.1%}")
+                            st.info(f"Uncertainty: ±₹{float(uncertainty):,.0f}")
+                        else:
+                            st.info("Enhanced prediction data format not recognized")
                     
                     cost_overrun = predictions.get('cost_overrun_inr', 0)
                     if cost_overrun > 0:
@@ -487,8 +529,19 @@ def show_single_prediction():
                     st.metric("Time Overrun", f"{predictions.get('time_overrun_percentage', 0):.1f}%")
                     
                     if enhanced_time_pred:
-                        st.info(f"Confidence: {enhanced_time_pred.get('confidence', 0):.1%}")
-                        st.info(f"Uncertainty: ±{enhanced_time_pred.get('uncertainty', 0):.1f} days")
+                        # Handle different return types from predict_with_uncertainty
+                        if isinstance(enhanced_time_pred, dict):
+                            confidence = enhanced_time_pred.get('confidence_level', 0.95)
+                            uncertainty_obj = enhanced_time_pred.get('uncertainty', 0)
+                            # Handle both scalar and array returns
+                            if hasattr(uncertainty_obj, '__len__') and len(uncertainty_obj) > 0:
+                                uncertainty = uncertainty_obj[0] if isinstance(uncertainty_obj, (list, np.ndarray)) else uncertainty_obj
+                            else:
+                                uncertainty = uncertainty_obj
+                            st.info(f"Confidence: {confidence:.1%}")
+                            st.info(f"Uncertainty: ±{float(uncertainty):.1f} days")
+                        else:
+                            st.info("Enhanced prediction data format not recognized")
                     
                     time_overrun = predictions.get('time_overrun_days', 0)
                     if time_overrun > 0:
@@ -786,28 +839,48 @@ def show_enhanced_hotspot_analysis():
         with st.spinner("🧠 Performing advanced hotspot analysis..."):
             risk_features = st.session_state.hotspot_analyzer.create_risk_features(df)
             
-            cluster_results = st.session_state.hotspot_analyzer.perform_clustering(
-                risk_features, n_clusters=n_clusters, method=clustering_method
+            # Perform clustering using the correct method
+            clustering_results, best_method, scaler = st.session_state.hotspot_analyzer.perform_multiple_clustering(
+                risk_features
             )
             
-            anomaly_scores = np.zeros(len(df))
-            if enable_anomaly:
-                anomaly_scores = st.session_state.hotspot_analyzer.detect_anomalies(
-                    risk_features, contamination=contamination
-                )
+            # Extract the best clustering results
+            cluster_labels = clustering_results[best_method]['labels']
+            silhouette_scores = clustering_results[best_method]['silhouette']
             
-            hotspot_scores = st.session_state.hotspot_analyzer.calculate_hotspot_score(
-                cluster_results['cluster_labels'], anomaly_scores, cluster_results['silhouette_scores']
+            # Detect anomalies using the correct method
+            anomaly_labels, anomaly_scores, anomaly_scaler = st.session_state.hotspot_analyzer.detect_anomalies(
+                risk_features
             )
             
-            recommendations = st.session_state.hotspot_analyzer.generate_recommendations(
-                hotspot_scores, cluster_results['cluster_labels']
+            # Calculate hotspot scores using the correct method
+            hotspot_scores, hotspot_categories = st.session_state.hotspot_analyzer.calculate_hotspot_scores(
+                clustering_results, anomaly_scores, best_method
             )
             
-            df['cluster'] = cluster_results['cluster_labels']
+            # Generate recommendations using the correct method
+            recommendations_data = st.session_state.hotspot_analyzer.generate_hotspot_recommendations(
+                df, hotspot_scores, hotspot_categories
+            )
+            
+            # Add results to dataframe
+            df['cluster'] = cluster_labels
             df['anomaly_score'] = anomaly_scores
             df['hotspot_score'] = hotspot_scores
-            df['recommendation'] = recommendations
+            df['risk_category'] = hotspot_categories
+            
+            # Create simple recommendations based on risk categories
+            def get_recommendation(risk_category):
+                if risk_category == 'Critical Hotspot':
+                    return 'Immediate intervention required'
+                elif risk_category == 'High Risk':
+                    return 'Enhanced monitoring needed'
+                elif risk_category == 'Medium Risk':
+                    return 'Regular monitoring'
+                else:
+                    return 'Standard procedures'
+            
+            df['recommendation'] = df['risk_category'].apply(get_recommendation)
         
         # Display results
         st.subheader("📊 Hotspot Analysis Results")
@@ -913,137 +986,6 @@ def show_enhanced_hotspot_analysis():
         
     except Exception as e:
         st.error(f"Error in enhanced hotspot analysis: {e}")
-
-def show_advanced_ml_analysis():
-    """Advanced ML analysis"""
-    st.header("🔧 Advanced ML Analysis")
-    
-    if not st.session_state.get('powergrid_ml'):
-        st.error("❌ ML model not loaded. Please check the configuration.")
-        return
-    
-    st.info("Advanced machine learning analysis with uncertainty quantification and feature importance")
-    
-    analysis_type = st.selectbox(
-        "Analysis Type",
-        ["Feature Importance Analysis", "Uncertainty Quantification", "Model Comparison"]
-    )
-    
-    try:
-        if analysis_type == "Feature Importance Analysis":
-            st.subheader("🔍 Feature Importance Analysis")
-            
-            with st.spinner("Analyzing feature importance..."):
-                cost_importance = st.session_state.powergrid_ml.get_feature_importance('cost')
-                time_importance = st.session_state.powergrid_ml.get_feature_importance('time')
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                if cost_importance:
-                    cost_df = pd.DataFrame(list(cost_importance.items()), columns=['Feature', 'Importance'])
-                    cost_df = cost_df.sort_values('Importance', ascending=True).tail(15)
-                    
-                    fig = px.bar(
-                        cost_df,
-                        x='Importance',
-                        y='Feature',
-                        orientation='h',
-                        title='Top 15 Features - Cost Prediction',
-                        color='Importance',
-                        color_continuous_scale='Blues'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("Feature importance not available")
-            
-            with col2:
-                if time_importance:
-                    time_df = pd.DataFrame(list(time_importance.items()), columns=['Feature', 'Importance'])
-                    time_df = time_df.sort_values('Importance', ascending=True).tail(15)
-                    
-                    fig = px.bar(
-                        time_df,
-                        x='Importance',
-                        y='Feature',
-                        orientation='h',
-                        title='Top 15 Features - Time Prediction',
-                        color='Importance',
-                        color_continuous_scale='Reds'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.info("Feature importance not available")
-        
-        elif analysis_type == "Uncertainty Quantification":
-            st.subheader("📊 Uncertainty Quantification")
-            
-            df = load_data()
-            if df.empty:
-                st.warning("No data available for analysis")
-                return
-            
-            sample_size = min(50, len(df))
-            sample_df = df.sample(n=sample_size, random_state=42)
-            
-            with st.spinner("Calculating prediction uncertainties..."):
-                uncertainties = []
-                
-                for _, project in sample_df.iterrows():
-                    project_dict = project.to_dict()
-                    
-                    try:
-                        cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(project_dict, 'cost')
-                        time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(project_dict, 'time')
-                        
-                        uncertainties.append({
-                            'project_id': project_dict.get('project_id', 'Unknown'),
-                            'cost_prediction': cost_pred.get('prediction', 0),
-                            'cost_std': cost_pred.get('uncertainty', 0),
-                            'cost_confidence': cost_pred.get('confidence', 0),
-                            'time_prediction': time_pred.get('prediction', 0),
-                            'time_std': time_pred.get('uncertainty', 0),
-                            'time_confidence': time_pred.get('confidence', 0)
-                        })
-                    except:
-                        continue
-            
-            if uncertainties:
-                uncertainty_df = pd.DataFrame(uncertainties)
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    fig = px.scatter(
-                        uncertainty_df,
-                        x='cost_prediction',
-                        y='cost_std',
-                        size='cost_confidence',
-                        title='Cost Prediction Uncertainty'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    fig = px.scatter(
-                        uncertainty_df,
-                        x='time_prediction',
-                        y='time_std',
-                        size='time_confidence',
-                        title='Time Prediction Uncertainty'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                st.dataframe(uncertainty_df.round(3))
-            else:
-                st.warning("Could not calculate uncertainties")
-        
-        elif analysis_type == "Model Comparison":
-            st.subheader("🏆 Model Comparison")
-            st.info("Comparing different model types for cost and time prediction")
-            st.write("Model comparison feature coming soon...")
-    
-    except Exception as e:
-        st.error(f"Error in advanced ML analysis: {e}")
 
 def show_model_performance():
     """Model performance metrics"""
