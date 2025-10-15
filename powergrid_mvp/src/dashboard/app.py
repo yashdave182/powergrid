@@ -49,6 +49,21 @@ st.markdown("""
         color: #2ca02c;
         font-weight: bold;
     }
+    .sidebar .sidebar-content {
+        background-color: #f8f9fa;
+        border-right: 1px solid #ddd;
+    }
+    .stButton > button {
+        background-color: #007bff;
+        color: white;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+    }
+    .stButton > button:hover {
+        background-color: #0056b3;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -179,32 +194,52 @@ def show_single_prediction():
     st.header("🎯 Single Project Prediction")
     st.info("Enter project details to get cost and time overrun predictions")
     
-    # Placeholder for prediction form
-    st.warning("Single prediction functionality coming soon!")
+    # User input
+    st.subheader("Input Features")
+    feature_names = st.session_state.predictor.get_feature_names()
+    user_input = {feature: st.number_input(feature, value=0.0) for feature in feature_names}
+    
+    # Convert user input to array
+    input_array = np.array([user_input[feature] for feature in feature_names]).reshape(1, -1)
+    
+    # Predictions
+    st.subheader("Predictions")
+    cost_prediction = st.session_state.predictor.predict_cost(input_array)
+    time_prediction = st.session_state.predictor.predict_time(input_array)
+    
+    st.success(f"Predicted Cost Overrun: {cost_prediction:.2f}%")
+    st.success(f"Predicted Time Overrun: {time_prediction:.2f}%")
 
 def show_batch_analysis():
     """Batch project analysis"""
     st.header("📈 Batch Analysis")
     st.info("Upload multiple projects for batch prediction and analysis")
     
-    # Placeholder for batch analysis
-    st.warning("Batch analysis functionality coming soon!")
+    uploaded_file = st.file_uploader("Upload CSV File", type="csv")
+    if uploaded_file is not None:
+        batch_data = pd.read_csv(uploaded_file)
+        predictions = st.session_state.predictor.predict_batch(batch_data)
+        st.dataframe(predictions)
 
 def show_risk_hotspots():
     """Risk hotspot identification"""
     st.header("🔍 Risk Hotspots")
     st.info("Identify regions and project types with highest risk")
     
-    # Placeholder for risk hotspots
-    st.warning("Risk hotspot analysis coming soon!")
+    try:
+        df = load_data()
+        hotspot_data = st.session_state.predictor.identify_hotspots(df)
+        st.dataframe(hotspot_data)
+    except Exception as e:
+        st.error(f"Error identifying hotspots: {e}")
 
 def show_model_performance():
     """Model performance metrics"""
     st.header("📋 Model Performance")
     st.info("View performance metrics for all trained models")
     
-    # Placeholder for model performance
-    st.warning("Model performance dashboard coming soon!")
+    metrics = st.session_state.predictor.get_metrics()
+    st.dataframe(metrics)
 
 # Run the app
 if __name__ == "__main__":
