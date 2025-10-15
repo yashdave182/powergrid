@@ -1,3 +1,4 @@
+# src/dashboard/app.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,16 +8,59 @@ from plotly.subplots import make_subplots
 import sys
 import os
 import json
-import requests
+import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
+import traceback
 
 # Add parent directory to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+sys.path.insert(0, parent_dir)
 
-from models.predictor import ProjectPredictor
-from models.powergrid_ml import PowerGridMLModel
-from models.hotspot_analyzer import PowerGridHotspotAnalyzer
-from data.powergrid_preprocessing import PowerGridPreprocessor
+# Safe import function
+def safe_import():
+    """Safely import all required modules with error handling"""
+    imports = {}
+    errors = []
+    
+    try:
+        from models.predictor import ProjectPredictor
+        imports['ProjectPredictor'] = ProjectPredictor
+    except Exception as e:
+        errors.append(f"ProjectPredictor: {str(e)}")
+        imports['ProjectPredictor'] = None
+    
+    try:
+        from models.powergrid_ml import PowerGridMLModel
+        imports['PowerGridMLModel'] = PowerGridMLModel
+    except Exception as e:
+        errors.append(f"PowerGridMLModel: {str(e)}")
+        imports['PowerGridMLModel'] = None
+    
+    try:
+        from models.hotspot_analyzer import PowerGridHotspotAnalyzer
+        imports['PowerGridHotspotAnalyzer'] = PowerGridHotspotAnalyzer
+    except Exception as e:
+        errors.append(f"PowerGridHotspotAnalyzer: {str(e)}")
+        imports['PowerGridHotspotAnalyzer'] = None
+    
+    try:
+        from data.powergrid_preprocessing import PowerGridPreprocessor
+        imports['PowerGridPreprocessor'] = PowerGridPreprocessor
+    except SyntaxError as e:
+        if "null bytes" in str(e):
+            errors.append("PowerGridPreprocessor: File contains null bytes - file corruption detected")
+        else:
+            errors.append(f"PowerGridPreprocessor: {str(e)}")
+        imports['PowerGridPreprocessor'] = None
+    except Exception as e:
+        errors.append(f"PowerGridPreprocessor: {str(e)}")
+        imports['PowerGridPreprocessor'] = None
+    
+    return imports, errors
+
+# Perform imports
+IMPORTS, IMPORT_ERRORS = safe_import()
 
 # Page config
 st.set_page_config(
@@ -73,26 +117,83 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Initialize session state
-if 'predictor' not in st.session_state:
+def initialize_models():
+    """Initialize all models with error handling"""
+    if 'initialized' in st.session_state:
+        return
+    
     with st.spinner("Loading models..."):
-        st.session_state.predictor = ProjectPredictor()
-        st.session_state.predictor.load_models()
-        st.session_state.preprocessor = PowerGridPreprocessor()
-        st.session_state.powergrid_ml = PowerGridMLModel()
-        st.session_state.hotspot_analyzer = PowerGridHotspotAnalyzer()
-        st.success("✅ All POWERGRID ML models loaded successfully!")
+        try:
+            # Initialize predictor
+            if IMPORTS['ProjectPredictor']:
+                st.session_state.predictor = IMPORTS['ProjectPredictor']()
+                st.session_state.predictor.load_models()
+            else:
+                st.session_state.predictor = None
+            
+            # Initialize preprocessor
+            if IMPORTS['PowerGridPreprocessor']:
+                st.session_state.preprocessor = IMPORTS['PowerGridPreprocessor']()
+            else:
+                st.session_state.preprocessor = None
+            
+            # Initialize ML model
+            if IMPORTS['PowerGridMLModel']:
+                st.session_state.powergrid_ml = IMPORTS['PowerGridMLModel']()
+            else:
+                st.session_state.powergrid_ml = None
+            
+            # Initialize hotspot analyzer
+            if IMPORTS['PowerGridHotspotAnalyzer']:
+                st.session_state.hotspot_analyzer = IMPORTS['PowerGridHotspotAnalyzer']()
+            else:
+                st.session_state.hotspot_analyzer = None
+            
+            st.session_state.initialized = True
+            
+            # Show success message
+            loaded_models = sum([1 for k, v in st.session_state.items() 
+                               if k in ['predictor', 'preprocessor', 'powergrid_ml', 'hotspot_analyzer'] 
+                               and v is not None])
+            
+            if loaded_models > 0:
+                st.success(f"✅ Successfully loaded {loaded_models}/4 models!")
+            else:
+                st.warning("⚠️ No models could be loaded. Please check configuration.")
+                
+        except Exception as e:
+            st.error(f"Error initializing models: {e}")
+            st.session_state.initialized = True
 
-# Load processed data for overview
+initialize_models()
+
+# Load processed data
 @st.cache_data
 def load_data():
-    df = pd.read_csv('data/processed/processed_data.csv')
-    # Date features
-    df['start_date'] = pd.to_datetime(df['start_date'])
-    df['start_year'] = df['start_date'].dt.year
-    df['start_month'] = df['start_date'].dt.month
-    df['start_quarter'] = df['start_date'].dt.quarter
-    df['is_monsoon_start'] = df['start_month'].apply(lambda x: 1 if x in [6,7,8,9] else 0)
-    return df
+    """Load and cache processed data"""
+    try:
+        data_path = os.path.join(parent_dir, 'data', 'processed', 'processed_data.csv')
+        
+        if not os.path.exists(data_path):
+            data_path = 'data/processed/processed_data.csv'
+        
+        df = pd.read_csv(data_path)
+        
+        # Date features
+        if 'start_date' in df.columns:
+            df['start_date'] = pd.to_datetime(df['start_date'], errors='coerce')
+            df['start_year'] = df['start_date'].dt.year
+            df['start_month'] = df['start_date'].dt.month
+            df['start_quarter'] = df['start_date'].dt.quarter
+            df['is_monsoon_start'] = df['start_month'].apply(lambda x: 1 if x in [6,7,8,9] else 0)
+        
+        return df
+    except FileNotFoundError:
+        st.error("⚠️ Data file not found. Please ensure processed_data.csv exists in data/processed/")
+        return pd.DataFrame()
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return pd.DataFrame()
 
 # Main app
 def main():
@@ -133,139 +234,126 @@ def show_overview():
     try:
         df = load_data()
         
-        # KPIs - using available columns from processed data
+        if df.empty:
+            st.warning("No data available for overview.")
+            return
+        
+        # KPIs
         col1, col2, col3, col4 = st.columns(4)
         
         with col1:
-            st.metric(
-                "Total Projects",
-                len(df),
-                delta=None
-            )
+            st.metric("Total Projects", len(df))
         
         with col2:
-            # Check if cost_overrun_percentage exists, otherwise use a placeholder
             if 'cost_overrun_percentage' in df.columns:
                 high_risk_count = len(df[df['cost_overrun_percentage'] > 20])
-                st.metric(
-                    "High Risk Projects",
-                    high_risk_count,
-                    delta=f"{high_risk_count/len(df)*100:.1f}%"
-                )
+                st.metric("High Risk Projects", high_risk_count, delta=f"{high_risk_count/len(df)*100:.1f}%")
             else:
-                st.metric(
-                    "High Risk Projects",
-                    "N/A",
-                    delta="Data not available"
-                )
+                st.metric("High Risk Projects", "N/A", delta="Data not available")
         
         with col3:
             if 'cost_overrun_percentage' in df.columns:
                 avg_cost_overrun = df['cost_overrun_percentage'].mean()
-                st.metric(
-                    "Avg Cost Overrun",
-                    f"{avg_cost_overrun:.1f}%",
-                    delta=None
-                )
+                st.metric("Avg Cost Overrun", f"{avg_cost_overrun:.1f}%")
             else:
-                st.metric(
-                    "Avg Cost Overrun",
-                    "N/A",
-                    delta="Data not available"
-                )
+                st.metric("Avg Cost Overrun", "N/A", delta="Data not available")
         
         with col4:
             if 'time_overrun_percentage' in df.columns:
                 avg_time_overrun = df['time_overrun_percentage'].mean()
-                st.metric(
-                    "Avg Time Overrun",
-                    f"{avg_time_overrun:.1f}%",
-                    delta=None
-                )
+                st.metric("Avg Time Overrun", f"{avg_time_overrun:.1f}%")
             else:
-                st.metric(
-                    "Avg Time Overrun",
-                    "N/A",
-                    delta="Data not available"
-                )
+                st.metric("Avg Time Overrun", "N/A", delta="Data not available")
         
         st.divider()
         
-        # Charts - using available numerical features
+        # Charts
         col1, col2 = st.columns(2)
         
         with col1:
-            # Distribution of terrain difficulty
             if 'terrain_difficulty_score' in df.columns:
                 fig = px.histogram(
                     df,
                     x='terrain_difficulty_score',
                     title='Terrain Difficulty Distribution',
-                    nbins=20
+                    nbins=20,
+                    color_discrete_sequence=['#1f77b4']
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Terrain difficulty data not available for visualization")
+                st.info("Terrain difficulty data not available")
         
         with col2:
-            # Distribution of project length
             if 'length_km' in df.columns:
                 fig = px.histogram(
                     df,
                     x='length_km',
                     title='Project Length Distribution (km)',
-                    nbins=20
+                    nbins=20,
+                    color_discrete_sequence=['#ff7f0e']
                 )
                 st.plotly_chart(fig, use_container_width=True)
             else:
-                st.info("Project length data not available for visualization")
+                st.info("Project length data not available")
         
         st.divider()
         
-        # Additional charts using available numerical features
+        # Additional charts
         col1, col2 = st.columns(2)
         
         with col1:
-            # Voltage level distribution
             if 'voltage_level_kv' in df.columns:
                 fig = px.box(
                     df,
                     y='voltage_level_kv',
-                    title='Voltage Level Distribution (kV)'
+                    title='Voltage Level Distribution (kV)',
+                    color_discrete_sequence=['#2ca02c']
                 )
                 st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Number of towers distribution
             if 'num_towers' in df.columns:
                 fig = px.box(
                     df,
                     y='num_towers',
-                    title='Number of Towers Distribution'
+                    title='Number of Towers Distribution',
+                    color_discrete_sequence=['#d62728']
                 )
                 st.plotly_chart(fig, use_container_width=True)
         
         st.divider()
         
-        # Show data summary
-        st.subheader("Data Summary")
-        st.write(f"Dataset shape: {df.shape}")
-        st.write(f"Number of features: {len(df.columns)}")
-        st.write(f"Available numerical features: {len(df.select_dtypes(include=[np.number]).columns)}")
+        # Data summary
+        st.subheader("📋 Data Summary")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Dataset Rows", df.shape[0])
+        with col2:
+            st.metric("Total Features", len(df.columns))
+        with col3:
+            st.metric("Numerical Features", len(df.select_dtypes(include=[np.number]).columns))
+        
+        # Show sample data
+        with st.expander("View Sample Data"):
+            st.dataframe(df.head(10))
         
     except Exception as e:
-        st.error(f"Error loading data: {e}")
+        st.error(f"Error in overview: {e}")
 
 def show_single_prediction():
     """Single project prediction interface"""
     st.header("🎯 Single Project Prediction")
+    
+    if not st.session_state.get('predictor'):
+        st.error("❌ Predictor model not loaded. Please check the configuration.")
+        return
+    
     st.info("Enter project details to get cost and time overrun predictions")
     
-    # Create a more user-friendly input form
     with st.form("project_prediction_form"):
         st.subheader("Project Details")
         
-        # Basic project information
+        # Basic information
         col1, col2 = st.columns(2)
         with col1:
             project_id = st.text_input("Project ID", value="PG_TEST_001")
@@ -305,7 +393,6 @@ def show_single_prediction():
             terrain_type = st.selectbox("Terrain Type", ["Plain", "Hilly", "Mountainous", "Desert"])
             start_date = st.date_input("Start Date")
         
-        # Submit button
         submitted = st.form_submit_button("🔮 Get Predictions")
     
     if submitted:
@@ -343,21 +430,22 @@ def show_single_prediction():
         # Make predictions
         with st.spinner("🧠 Analyzing project data..."):
             try:
-                # Get predictions from both models
                 predictions = st.session_state.predictor.predict(project_data)
                 
-                # Get enhanced predictions with uncertainty
-                try:
-                    enhanced_cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                        project_data, 'cost'
-                    )
-                    enhanced_time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                        project_data, 'time'
-                    )
-                except Exception as e:
-                    enhanced_cost_pred = None
-                    enhanced_time_pred = None
-                    st.warning(f"Enhanced predictions not available: {e}")
+                # Enhanced predictions
+                enhanced_cost_pred = None
+                enhanced_time_pred = None
+                
+                if st.session_state.get('powergrid_ml'):
+                    try:
+                        enhanced_cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                            project_data, 'cost'
+                        )
+                        enhanced_time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
+                            project_data, 'time'
+                        )
+                    except:
+                        pass
                 
                 # Display results
                 st.subheader("📊 Prediction Results")
@@ -365,103 +453,91 @@ def show_single_prediction():
                 # Risk assessment
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Risk Category", predictions['risk_category'])
+                    st.metric("Risk Category", predictions.get('risk_category', 'N/A'))
                 with col2:
-                    st.metric("Priority Level", predictions['priority'])
+                    st.metric("Priority Level", predictions.get('priority', 'N/A'))
                 with col3:
-                    st.metric("Risk Score", f"{predictions['risk_score']:.3f}")
+                    st.metric("Risk Score", f"{predictions.get('risk_score', 0):.3f}")
                 
                 st.divider()
                 
-                # Cost predictions
+                # Cost and Time predictions
                 col1, col2 = st.columns(2)
+                
                 with col1:
                     st.subheader("💰 Cost Analysis")
-                    st.metric("Estimated Cost", f"₹{predictions['estimated_cost_inr']:,.0f}")
-                    st.metric("Predicted Cost", f"₹{predictions['predicted_cost_inr']:,.0f}")
-                    st.metric("Cost Overrun", f"{predictions['cost_overrun_percentage']:.1f}%")
+                    st.metric("Estimated Cost", f"₹{predictions.get('estimated_cost_inr', 0):,.0f}")
+                    st.metric("Predicted Cost", f"₹{predictions.get('predicted_cost_inr', 0):,.0f}")
+                    st.metric("Cost Overrun", f"{predictions.get('cost_overrun_percentage', 0):.1f}%")
                     
-                    # Enhanced uncertainty information
                     if enhanced_cost_pred:
-                        st.info(f"Confidence: {enhanced_cost_pred['confidence']:.1%}")
-                        st.info(f"Uncertainty: ±₹{enhanced_cost_pred['uncertainty']:,.0f}")
-                        st.info(f"Prediction Interval: ₹{enhanced_cost_pred['prediction_interval'][0]:,.0f} - ₹{enhanced_cost_pred['prediction_interval'][1]:,.0f}")
+                        st.info(f"Confidence: {enhanced_cost_pred.get('confidence', 0):.1%}")
+                        st.info(f"Uncertainty: ±₹{enhanced_cost_pred.get('uncertainty', 0):,.0f}")
                     
-                    if predictions['cost_overrun_inr'] > 0:
-                        st.error(f"Expected cost increase: ₹{predictions['cost_overrun_inr']:,.0f}")
+                    cost_overrun = predictions.get('cost_overrun_inr', 0)
+                    if cost_overrun > 0:
+                        st.error(f"Expected cost increase: ₹{cost_overrun:,.0f}")
                     else:
-                        st.success(f"Expected cost savings: ₹{abs(predictions['cost_overrun_inr']):,.0f}")
+                        st.success(f"Expected cost savings: ₹{abs(cost_overrun):,.0f}")
                 
-                # Time predictions
                 with col2:
                     st.subheader("⏱️ Timeline Analysis")
-                    st.metric("Estimated Duration", f"{predictions['estimated_duration_days']} days")
-                    st.metric("Predicted Duration", f"{predictions['predicted_duration_days']} days")
-                    st.metric("Time Overrun", f"{predictions['time_overrun_percentage']:.1f}%")
+                    st.metric("Estimated Duration", f"{predictions.get('estimated_duration_days', 0)} days")
+                    st.metric("Predicted Duration", f"{predictions.get('predicted_duration_days', 0)} days")
+                    st.metric("Time Overrun", f"{predictions.get('time_overrun_percentage', 0):.1f}%")
                     
-                    # Enhanced uncertainty information
                     if enhanced_time_pred:
-                        st.info(f"Confidence: {enhanced_time_pred['confidence']:.1%}")
-                        st.info(f"Uncertainty: ±{enhanced_time_pred['uncertainty']:.1f} days")
-                        st.info(f"Prediction Interval: {enhanced_time_pred['prediction_interval'][0]:.1f} - {enhanced_time_pred['prediction_interval'][1]:.1f} days")
+                        st.info(f"Confidence: {enhanced_time_pred.get('confidence', 0):.1%}")
+                        st.info(f"Uncertainty: ±{enhanced_time_pred.get('uncertainty', 0):.1f} days")
                     
-                    if predictions['time_overrun_days'] > 0:
-                        st.error(f"Expected delay: {predictions['time_overrun_days']} days")
+                    time_overrun = predictions.get('time_overrun_days', 0)
+                    if time_overrun > 0:
+                        st.error(f"Expected delay: {time_overrun} days")
                     else:
-                        st.success(f"Expected time savings: {abs(predictions['time_overrun_days'])} days")
+                        st.success(f"Expected time savings: {abs(time_overrun)} days")
                 
                 st.divider()
                 
-                # Domain-specific features analysis
-                st.subheader("🔧 Domain-Specific Analysis")
-                
-                try:
-                    # Create domain-specific features
-                    domain_features = st.session_state.preprocessor.create_domain_specific_features(project_data)
+                # Domain-specific analysis
+                if st.session_state.get('preprocessor'):
+                    st.subheader("🔧 Domain-Specific Analysis")
                     
-                    col1, col2 = st.columns(2)
+                    try:
+                        domain_features = st.session_state.preprocessor.create_domain_specific_features(project_data)
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.write("**Key Domain Features:**")
+                            for key in ['project_type_encoded', 'terrain_risk_score', 'cost_intensity_per_km', 'timeline_pressure_score']:
+                                if key in domain_features:
+                                    st.info(f"{key.replace('_', ' ').title()}: {domain_features[key]:.2f}")
+                        
+                        with col2:
+                            st.write("**Risk Factors:**")
+                            for key in ['weather_impact_score', 'vendor_risk_score', 'regulatory_complexity_score', 'resource_availability_score']:
+                                if key in domain_features:
+                                    value = domain_features[key]
+                                    risk_level = "High" if value > 0.7 else "Medium" if value > 0.4 else "Low"
+                                    st.info(f"{key.replace('_', ' ').title()}: {risk_level}")
                     
-                    with col1:
-                        st.write("**Key Domain Features:**")
-                        if 'project_type_encoded' in domain_features:
-                            st.info(f"Project Type Score: {domain_features.get('project_type_encoded', 0):.2f}")
-                        if 'terrain_risk_score' in domain_features:
-                            st.info(f"Terrain Risk Score: {domain_features.get('terrain_risk_score', 0):.2f}")
-                        if 'cost_intensity_per_km' in domain_features:
-                            st.info(f"Cost Intensity: ₹{domain_features.get('cost_intensity_per_km', 0):,.0f}/km")
-                        if 'timeline_pressure_score' in domain_features:
-                            st.info(f"Timeline Pressure: {domain_features.get('timeline_pressure_score', 0):.2f}")
-                    
-                    with col2:
-                        st.write("**Risk Factors:**")
-                        if 'weather_impact_score' in domain_features:
-                            weather_risk = "High" if domain_features.get('weather_impact_score', 0) > 0.7 else "Medium" if domain_features.get('weather_impact_score', 0) > 0.4 else "Low"
-                            st.info(f"Weather Impact: {weather_risk}")
-                        if 'vendor_risk_score' in domain_features:
-                            vendor_risk = "High" if domain_features.get('vendor_risk_score', 0) > 0.7 else "Medium" if domain_features.get('vendor_risk_score', 0) > 0.4 else "Low"
-                            st.info(f"Vendor Risk: {vendor_risk}")
-                        if 'regulatory_complexity_score' in domain_features:
-                            reg_risk = "High" if domain_features.get('regulatory_complexity_score', 0) > 0.7 else "Medium" if domain_features.get('regulatory_complexity_score', 0) > 0.4 else "Low"
-                            st.info(f"Regulatory Complexity: {reg_risk}")
-                        if 'resource_availability_score' in domain_features:
-                            resource_risk = "High" if domain_features.get('resource_availability_score', 0) < 0.3 else "Medium" if domain_features.get('resource_availability_score', 0) < 0.6 else "Low"
-                            st.info(f"Resource Risk: {resource_risk}")
-                    
-                except Exception as e:
-                    st.warning(f"Domain-specific analysis not available: {e}")
+                    except:
+                        pass
                 
                 st.divider()
                 
-                # Recommendations based on risk level
+                # Recommendations
                 st.subheader("💡 Recommendations")
-                if predictions['risk_category'] == "High":
+                risk_cat = predictions.get('risk_category', 'Medium')
+                
+                if risk_cat == "High":
                     st.error("⚠️ High Risk Project - Immediate attention required!")
                     st.write("**Recommended Actions:**")
                     st.write("- Conduct detailed risk assessment and mitigation planning")
                     st.write("- Increase project monitoring frequency")
                     st.write("- Consider buffer allocation for cost and timeline")
                     st.write("- Engage experienced project managers")
-                elif predictions['risk_category'] == "Medium":
+                elif risk_cat == "Medium":
                     st.warning("⚡ Medium Risk Project - Regular monitoring recommended")
                     st.write("**Recommended Actions:**")
                     st.write("- Implement standard risk management procedures")
@@ -476,138 +552,112 @@ def show_single_prediction():
                 
             except Exception as e:
                 st.error(f"Error making predictions: {e}")
-                st.write("Please check your input data and try again.")
 
 def show_batch_analysis():
     """Batch project analysis"""
     st.header("📈 Batch Analysis")
+    
+    if not st.session_state.get('predictor'):
+        st.error("❌ Predictor model not loaded. Please check the configuration.")
+        return
+    
     st.info("Upload multiple projects for batch prediction and analysis")
     
     uploaded_file = st.file_uploader("Upload CSV File", type="csv")
+    
     if uploaded_file is not None:
         try:
             batch_data = pd.read_csv(uploaded_file)
             
-            # Convert DataFrame to list of dictionaries for batch prediction
+            st.write("**Preview of uploaded data:**")
+            st.dataframe(batch_data.head())
+            
+            # Convert to list of dictionaries
             projects_list = batch_data.to_dict('records')
             
             with st.spinner("🧠 Analyzing batch data..."):
                 predictions = st.session_state.predictor.batch_predict(projects_list)
             
-            # Convert predictions to DataFrame for display
+            # Convert to DataFrame
             pred_df = pd.DataFrame(predictions)
             
-            st.subheader("📊 Enhanced Batch Prediction Results")
+            st.subheader("📊 Batch Prediction Results")
             
-            # Enhanced batch prediction options
-            col1, col2 = st.columns(2)
-            with col1:
-                include_uncertainty = st.checkbox("Include uncertainty quantification", value=True)
-            with col2:
-                include_domain_features = st.checkbox("Include domain-specific analysis", value=True)
-            
-            # Show columns selector for detailed view
+            # Column selector
             available_columns = pred_df.columns.tolist()
-            default_columns = ['project_id', 'predicted_cost', 'predicted_duration', 'risk_category', 'cost_overrun_percentage', 'time_overrun_percentage']
-            selected_columns = st.multiselect("Select columns to display:", available_columns, default=default_columns)
+            default_columns = [col for col in ['project_id', 'predicted_cost_inr', 'predicted_duration_days', 
+                                                'risk_category', 'cost_overrun_percentage', 'time_overrun_percentage'] 
+                              if col in available_columns]
+            
+            selected_columns = st.multiselect(
+                "Select columns to display:",
+                available_columns,
+                default=default_columns if default_columns else available_columns[:6]
+            )
             
             if selected_columns:
                 st.dataframe(pred_df[selected_columns], use_container_width=True)
             else:
                 st.dataframe(pred_df, use_container_width=True)
             
-            # Enhanced summary statistics
-            if 'cost_overrun_percentage' in pred_df.columns and 'time_overrun_percentage' in pred_df.columns:
-                col1, col2, col3, col4 = st.columns(4)
-                with col1:
-                    st.metric("Total Projects", len(pred_df))
-                with col2:
-                    high_risk_count = len(pred_df[pred_df['risk_category'] == 'High'])
-                    st.metric("High Risk Projects", high_risk_count)
-                with col3:
-                    st.metric("Average Cost Overrun", f"{pred_df['cost_overrun_percentage'].mean():.1f}%")
-                with col4:
-                    st.metric("Average Time Overrun", f"{pred_df['time_overrun_percentage'].mean():.1f}%")
+            # Summary statistics
+            st.subheader("📊 Summary Statistics")
+            col1, col2, col3, col4 = st.columns(4)
             
-            # Additional metrics if enhanced predictions are available
-            if include_uncertainty and hasattr(st.session_state, 'powergrid_ml'):
-                try:
-                    # Add enhanced predictions to the dataframe
-                    enhanced_predictions = []
-                    for idx, row in df.iterrows():
-                        project_data = row.to_dict()
-                        
-                        # Get enhanced predictions with uncertainty
-                        cost_pred_enhanced = st.session_state.powergrid_ml.predict_with_uncertainty(project_data)
-                        time_pred_enhanced = st.session_state.powergrid_ml.predict_with_uncertainty(project_data, target='timeline')
-                        
-                        enhanced_predictions.append({
-                            'enhanced_cost': cost_pred_enhanced.get('prediction', 0) if isinstance(cost_pred_enhanced, dict) else float(cost_pred_enhanced),
-                            'cost_uncertainty': cost_pred_enhanced.get('uncertainty', 0) if isinstance(cost_pred_enhanced, dict) else 0,
-                            'enhanced_time': time_pred_enhanced.get('prediction', 0) if isinstance(time_pred_enhanced, dict) else float(time_pred_enhanced),
-                            'time_uncertainty': time_pred_enhanced.get('uncertainty', 0) if isinstance(time_pred_enhanced, dict) else 0
-                        })
-                    
-                    enhanced_df = pd.DataFrame(enhanced_predictions)
-                    pred_df = pd.concat([pred_df, enhanced_df], axis=1)
-                    
-                    # Show uncertainty metrics
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        avg_cost_uncertainty = pred_df['cost_uncertainty'].mean()
-                        st.metric("Avg Cost Uncertainty", f"{avg_cost_uncertainty:.2f}")
-                    with col2:
-                        avg_time_uncertainty = pred_df['time_uncertainty'].mean()
-                        st.metric("Avg Time Uncertainty", f"{avg_time_uncertainty:.2f}")
-                        
-                except Exception as e:
-                    st.warning(f"Enhanced predictions not available: {e}")
+            with col1:
+                st.metric("Total Projects", len(pred_df))
             
-            # Domain features analysis
-            if include_domain_features and hasattr(st.session_state, 'preprocessor'):
-                try:
-                    domain_features_list = []
-                    for idx, row in df.iterrows():
-                        project_data = row.to_dict()
-                        domain_features = st.session_state.preprocessor.create_domain_specific_features(project_data)
-                        domain_features_list.append(domain_features)
-                    
-                    domain_df = pd.DataFrame(domain_features_list)
-                    pred_df = pd.concat([pred_df, domain_df], axis=1)
-                    
-                    # Show domain features analysis
-                    st.write("#### 🔧 Domain Features Analysis")
-                    domain_cols = [col for col in pred_df.columns if any(score_type in col.lower() for score_type in ['risk', 'intensity', 'pressure', 'impact', 'complexity'])]
-                    
-                    if domain_cols:
-                        fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-                        axes = axes.ravel()
-                        
-                        for i, col in enumerate(domain_cols[:4]):
-                            if i < len(axes) and col in pred_df.columns:
-                                axes[i].hist(pred_df[col], bins=20, alpha=0.7, color='skyblue')
-                                axes[i].set_title(f'{col.replace("_", " ").title()}')
-                                axes[i].set_xlabel('Score')
-                                axes[i].set_ylabel('Frequency')
-                        
-                        plt.tight_layout()
-                        st.pyplot(fig)
-                        
-                except Exception as e:
-                    st.warning(f"Domain features analysis not available: {e}")
+            with col2:
+                if 'risk_category' in pred_df.columns:
+                    high_risk = len(pred_df[pred_df['risk_category'] == 'High'])
+                    st.metric("High Risk Projects", high_risk)
+            
+            with col3:
+                if 'cost_overrun_percentage' in pred_df.columns:
+                    avg_cost = pred_df['cost_overrun_percentage'].mean()
+                    st.metric("Avg Cost Overrun", f"{avg_cost:.1f}%")
+            
+            with col4:
+                if 'time_overrun_percentage' in pred_df.columns:
+                    avg_time = pred_df['time_overrun_percentage'].mean()
+                    st.metric("Avg Time Overrun", f"{avg_time:.1f}%")
+            
+            # Visualizations
+            st.subheader("📊 Analysis Charts")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if 'risk_category' in pred_df.columns:
+                    risk_counts = pred_df['risk_category'].value_counts()
+                    fig = px.pie(
+                        values=risk_counts.values,
+                        names=risk_counts.index,
+                        title='Risk Category Distribution',
+                        hole=0.4
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                if 'cost_overrun_percentage' in pred_df.columns:
+                    fig = px.histogram(
+                        pred_df,
+                        x='cost_overrun_percentage',
+                        title='Cost Overrun Distribution',
+                        nbins=20
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
             
             # Download results
             csv = pred_df.to_csv(index=False)
             st.download_button(
-                label="📥 Download Enhanced Predictions CSV",
+                label="📥 Download Predictions CSV",
                 data=csv,
-                file_name="enhanced_batch_predictions.csv",
+                file_name=f"batch_predictions_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 mime="text/csv"
             )
             
         except Exception as e:
             st.error(f"Error processing batch data: {e}")
-            st.write("Please ensure your CSV file has the correct format with all required columns.")
 
 def show_risk_hotspots():
     """Risk hotspot identification"""
@@ -615,12 +665,15 @@ def show_risk_hotspots():
     st.info("Identify regions and project types with highest risk")
     
     try:
-        # Load cluster assignments
-        cluster_data = pd.read_csv('outputs/cluster_assignments.csv')
+        cluster_path = os.path.join(parent_dir, 'outputs', 'cluster_assignments.csv')
+        if not os.path.exists(cluster_path):
+            cluster_path = 'outputs/cluster_assignments.csv'
+        
+        cluster_data = pd.read_csv(cluster_path)
         
         st.subheader("📊 Cluster Analysis")
         
-        # Show cluster distribution
+        # Cluster distribution
         cluster_counts = cluster_data['cluster'].value_counts().sort_index()
         col1, col2 = st.columns(2)
         
@@ -644,129 +697,113 @@ def show_risk_hotspots():
         
         st.divider()
         
-        # Display cluster details
+        # Cluster statistics
         st.subheader("🔍 Cluster Details")
         
-        # Group by cluster and show statistics
-        cluster_stats = cluster_data.groupby('cluster').agg({
-            'length_km': ['mean', 'std'],
-            'voltage_level_kv': 'mean',
-            'terrain_difficulty_score': 'mean',
-            'project_complexity_score': 'mean'
-        }).round(2)
+        numeric_cols = cluster_data.select_dtypes(include=[np.number]).columns
+        numeric_cols = [col for col in numeric_cols if col != 'cluster']
         
-        cluster_stats.columns = ['_'.join(col).strip() for col in cluster_stats.columns]
-        st.dataframe(cluster_stats)
+        if numeric_cols:
+            cluster_stats = cluster_data.groupby('cluster')[numeric_cols].mean().round(2)
+            st.dataframe(cluster_stats)
         
+        # Hotspot visualization
         st.divider()
-        
-        # Show hotspot visualization
         st.subheader("🗺️ Hotspot Visualization")
-        try:
-            st.image('outputs/hotspot_clusters.png', caption='Project Risk Hotspots Clustering', use_column_width=True)
-        except Exception as e:
-            st.warning("Cluster visualization not available")
         
+        img_path = os.path.join(parent_dir, 'outputs', 'hotspot_clusters.png')
+        if not os.path.exists(img_path):
+            img_path = 'outputs/hotspot_clusters.png'
+        
+        if os.path.exists(img_path):
+            st.image(img_path, caption='Project Risk Hotspots Clustering', use_column_width=True)
+        else:
+            st.info("Cluster visualization image not found")
+        
+        # Risk assessment
         st.divider()
+        st.subheader("⚠️ Risk Assessment by Cluster")
         
-        # Risk assessment based on clusters
-        st.subheader("⚠️ Risk Assessment")
-        
-        # Analyze which clusters represent higher risk based on feature values
         for cluster_id in sorted(cluster_data['cluster'].unique()):
             cluster_subset = cluster_data[cluster_data['cluster'] == cluster_id]
             
-            # Calculate risk indicators
-            avg_length = cluster_subset['length_km'].mean()
-            avg_terrain = cluster_subset['terrain_difficulty_score'].mean() if 'terrain_difficulty_score' in cluster_subset.columns else 5.0
+            # Calculate risk score
+            avg_length = cluster_subset['length_km'].mean() if 'length_km' in cluster_subset.columns else 100
+            avg_terrain = cluster_subset['terrain_difficulty_score'].mean() if 'terrain_difficulty_score' in cluster_subset.columns else 5
             avg_complexity = cluster_subset['project_complexity_score'].mean() if 'project_complexity_score' in cluster_subset.columns else 0.5
             
-            # Simple risk scoring
             risk_score = (avg_length / 200) * 0.3 + (avg_terrain / 10) * 0.4 + avg_complexity * 0.3
             
             if risk_score > 0.7:
                 risk_level = "🔴 High Risk"
-                color = "error"
             elif risk_score > 0.4:
                 risk_level = "🟡 Medium Risk"
-                color = "warning"
             else:
                 risk_level = "🟢 Low Risk"
-                color = "success"
             
             with st.expander(f"Cluster {cluster_id} - {risk_level}"):
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Projects in Cluster", len(cluster_subset))
+                    st.metric("Projects", len(cluster_subset))
                 with col2:
                     st.metric("Avg Length (km)", f"{avg_length:.1f}")
                 with col3:
-                    st.metric("Avg Terrain Difficulty", f"{avg_terrain:.1f}")
-                
-                if color == "error":
-                    st.error(f"Risk Score: {risk_score:.2f}")
-                elif color == "warning":
-                    st.warning(f"Risk Score: {risk_score:.2f}")
-                else:
-                    st.success(f"Risk Score: {risk_score:.2f}")
+                    st.metric("Risk Score", f"{risk_score:.2f}")
         
     except FileNotFoundError:
-        st.error("Cluster assignments file not found. Please run hotspot identification first.")
+        st.error("Cluster data not found. Please run hotspot identification first.")
     except Exception as e:
         st.error(f"Error loading hotspot data: {e}")
 
 def show_enhanced_hotspot_analysis():
-    """Enhanced hotspot analysis using PowerGridHotspotAnalyzer"""
+    """Enhanced hotspot analysis"""
     st.header("⚡ Enhanced Hotspot Analysis")
+    
+    if not st.session_state.get('hotspot_analyzer'):
+        st.error("❌ Hotspot analyzer not loaded. Please check the configuration.")
+        return
+    
     st.info("Advanced clustering and anomaly detection for project risk identification")
     
     try:
-        # Load data for analysis
         df = load_data()
         
-        if len(df) < 10:
+        if df.empty or len(df) < 10:
             st.warning("⚠️ Insufficient data for advanced hotspot analysis. Need at least 10 projects.")
             return
         
-        # Analysis configuration
+        # Configuration
         with st.expander("🔧 Analysis Configuration"):
             col1, col2 = st.columns(2)
             with col1:
-                n_clusters = st.slider("Number of Clusters", min_value=2, max_value=10, value=4)
-                contamination = st.slider("Anomaly Contamination", min_value=0.01, max_value=0.2, value=0.05, step=0.01)
+                n_clusters = st.slider("Number of Clusters", 2, 10, 4)
+                contamination = st.slider("Anomaly Contamination", 0.01, 0.2, 0.05, 0.01)
             with col2:
                 clustering_method = st.selectbox("Clustering Method", ["kmeans", "dbscan", "gmm", "agglomerative"])
-                enable_anomaly_detection = st.checkbox("Enable Anomaly Detection", value=True)
+                enable_anomaly = st.checkbox("Enable Anomaly Detection", True)
         
-        # Perform enhanced hotspot analysis
+        # Perform analysis
         with st.spinner("🧠 Performing advanced hotspot analysis..."):
-            # Create risk features
             risk_features = st.session_state.hotspot_analyzer.create_risk_features(df)
             
-            # Perform clustering
             cluster_results = st.session_state.hotspot_analyzer.perform_clustering(
                 risk_features, n_clusters=n_clusters, method=clustering_method
             )
             
-            # Detect anomalies
-            if enable_anomaly_detection:
+            anomaly_scores = np.zeros(len(df))
+            if enable_anomaly:
                 anomaly_scores = st.session_state.hotspot_analyzer.detect_anomalies(
                     risk_features, contamination=contamination
                 )
-            else:
-                anomaly_scores = np.zeros(len(df))
             
-            # Calculate hotspot scores
             hotspot_scores = st.session_state.hotspot_analyzer.calculate_hotspot_score(
                 cluster_results['cluster_labels'], anomaly_scores, cluster_results['silhouette_scores']
             )
             
-            # Generate recommendations
             recommendations = st.session_state.hotspot_analyzer.generate_recommendations(
                 hotspot_scores, cluster_results['cluster_labels']
             )
             
-            # Add results to dataframe
             df['cluster'] = cluster_results['cluster_labels']
             df['anomaly_score'] = anomaly_scores
             df['hotspot_score'] = hotspot_scores
@@ -775,7 +812,6 @@ def show_enhanced_hotspot_analysis():
         # Display results
         st.subheader("📊 Hotspot Analysis Results")
         
-        # Summary metrics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             n_hotspots = len(df[df['hotspot_score'] > 0.7])
@@ -784,35 +820,33 @@ def show_enhanced_hotspot_analysis():
             n_anomalies = len(df[df['anomaly_score'] > 0.5])
             st.metric("Anomalies Detected", n_anomalies)
         with col3:
-            avg_hotspot_score = df['hotspot_score'].mean()
-            st.metric("Average Hotspot Score", f"{avg_hotspot_score:.3f}")
+            avg_score = df['hotspot_score'].mean()
+            st.metric("Avg Hotspot Score", f"{avg_score:.3f}")
         with col4:
-            best_cluster = cluster_results['cluster_labels'][np.argmin(hotspot_scores)]
-            st.metric("Best Performing Cluster", f"Cluster {best_cluster}")
+            best_cluster = df.groupby('cluster')['hotspot_score'].mean().idxmin()
+            st.metric("Best Cluster", f"Cluster {best_cluster}")
         
         st.divider()
         
-        # Cluster visualization
+        # Visualizations
         col1, col2 = st.columns(2)
         
         with col1:
-            # Cluster distribution
-            fig = px.scatter_3d(
-                df, 
-                x='length_km', 
-                y='voltage_level_kv', 
-                z='hotspot_score',
-                color='cluster',
-                size='hotspot_score',
-                title='3D Hotspot Visualization',
-                labels={'hotspot_score': 'Risk Score'}
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            if all(col in df.columns for col in ['length_km', 'voltage_level_kv', 'hotspot_score']):
+                fig = px.scatter_3d(
+                    df,
+                    x='length_km',
+                    y='voltage_level_kv',
+                    z='hotspot_score',
+                    color='cluster',
+                    size='hotspot_score',
+                    title='3D Hotspot Visualization'
+                )
+                st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Hotspot score distribution
             fig = px.histogram(
-                df, 
+                df,
                 x='hotspot_score',
                 nbins=20,
                 title='Hotspot Score Distribution',
@@ -822,35 +856,19 @@ def show_enhanced_hotspot_analysis():
         
         st.divider()
         
-        # Detailed cluster analysis
-        st.subheader("🔍 Detailed Cluster Analysis")
-        
-        cluster_summary = df.groupby('cluster').agg({
-            'hotspot_score': ['mean', 'std', 'count'],
-            'length_km': 'mean',
-            'voltage_level_kv': 'mean',
-            'anomaly_score': 'mean'
-        }).round(3)
-        
-        cluster_summary.columns = ['_'.join(col).strip() for col in cluster_summary.columns]
-        st.dataframe(cluster_summary)
-        
-        st.divider()
-        
         # Risk categorization
         st.subheader("🎯 Risk Categorization")
         
-        # Categorize projects by risk level
         df['risk_level'] = pd.cut(
-            df['hotspot_score'], 
-            bins=[0, 0.3, 0.7, 1.0], 
+            df['hotspot_score'],
+            bins=[0, 0.3, 0.7, 1.0],
             labels=['Low Risk', 'Medium Risk', 'High Risk']
         )
         
-        risk_summary = df['risk_level'].value_counts()
         col1, col2 = st.columns(2)
         
         with col1:
+            risk_summary = df['risk_level'].value_counts()
             fig = px.pie(
                 values=risk_summary.values,
                 names=risk_summary.index,
@@ -860,7 +878,6 @@ def show_enhanced_hotspot_analysis():
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Risk by cluster
             risk_cluster = pd.crosstab(df['cluster'], df['risk_level'])
             fig = px.bar(
                 risk_cluster,
@@ -871,75 +888,52 @@ def show_enhanced_hotspot_analysis():
         
         st.divider()
         
-        # Recommendations
-        st.subheader("💡 Strategic Recommendations")
+        # High priority projects
+        st.subheader("🚨 High Priority Projects")
+        high_risk = df[df['hotspot_score'] > 0.7].sort_values('hotspot_score', ascending=False)
         
-        # High risk projects
-        high_risk_projects = df[df['hotspot_score'] > 0.7].sort_values('hotspot_score', ascending=False)
-        if len(high_risk_projects) > 0:
-            st.error("🚨 High Priority Projects (Immediate Attention Required)")
-            st.dataframe(high_risk_projects[['project_id', 'hotspot_score', 'recommendation']].head(10))
+        if len(high_risk) > 0:
+            display_cols = ['project_id', 'hotspot_score', 'recommendation'] if 'project_id' in high_risk.columns else ['hotspot_score', 'recommendation']
+            st.dataframe(high_risk[display_cols].head(10))
+        else:
+            st.success("No high-risk projects detected!")
         
-        # Medium risk projects
-        medium_risk_projects = df[(df['hotspot_score'] > 0.3) & (df['hotspot_score'] <= 0.7)]
-        if len(medium_risk_projects) > 0:
-            st.warning("⚡ Medium Priority Projects (Regular Monitoring)")
-            st.dataframe(medium_risk_projects[['project_id', 'hotspot_score', 'recommendation']].head(10))
-        
+        # Export
         st.divider()
-        
-        # Export results
-        st.subheader("📤 Export Analysis Results")
-        
-        export_df = df[['project_id', 'cluster', 'hotspot_score', 'anomaly_score', 'risk_level', 'recommendation']]
+        export_cols = ['project_id', 'cluster', 'hotspot_score', 'anomaly_score', 'risk_level', 'recommendation'] if 'project_id' in df.columns else ['cluster', 'hotspot_score', 'anomaly_score', 'risk_level', 'recommendation']
+        export_df = df[export_cols]
         csv = export_df.to_csv(index=False)
         
-        col1, col2 = st.columns(2)
-        with col1:
-            st.download_button(
-                label="📥 Download Hotspot Analysis Results",
-                data=csv,
-                file_name=f"hotspot_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
-                mime="text/csv"
-            )
-        
-        with col2:
-            if st.button("🔄 Re-run Analysis"):
-                st.rerun()
+        st.download_button(
+            label="📥 Download Hotspot Analysis",
+            data=csv,
+            file_name=f"hotspot_analysis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
         
     except Exception as e:
         st.error(f"Error in enhanced hotspot analysis: {e}")
-        st.write("Please ensure you have sufficient data and try again.")
 
 def show_advanced_ml_analysis():
-    """Advanced ML analysis using PowerGridMLModel"""
+    """Advanced ML analysis"""
     st.header("🔧 Advanced ML Analysis")
+    
+    if not st.session_state.get('powergrid_ml'):
+        st.error("❌ ML model not loaded. Please check the configuration.")
+        return
+    
     st.info("Advanced machine learning analysis with uncertainty quantification and feature importance")
     
+    analysis_type = st.selectbox(
+        "Analysis Type",
+        ["Feature Importance Analysis", "Uncertainty Quantification", "Model Comparison"]
+    )
+    
     try:
-        # Load data
-        df = load_data()
-        
-        if len(df) < 5:
-            st.warning("⚠️ Insufficient data for advanced ML analysis. Need at least 5 projects.")
-            return
-        
-        # Analysis options
-        with st.expander("🔧 Analysis Options"):
-            analysis_type = st.selectbox(
-                "Analysis Type",
-                ["Feature Importance Analysis", "Uncertainty Quantification", "Model Comparison", "Prediction with Confidence"]
-            )
-            
-            if analysis_type == "Prediction with Confidence":
-                st.write("Use the Single Project Prediction tab for individual predictions with confidence intervals")
-                return
-        
         if analysis_type == "Feature Importance Analysis":
             st.subheader("🔍 Feature Importance Analysis")
             
             with st.spinner("Analyzing feature importance..."):
-                # Get feature importance for both cost and time models
                 cost_importance = st.session_state.powergrid_ml.get_feature_importance('cost')
                 time_importance = st.session_state.powergrid_ml.get_feature_importance('time')
             
@@ -951,8 +945,8 @@ def show_advanced_ml_analysis():
                     cost_df = cost_df.sort_values('Importance', ascending=True).tail(15)
                     
                     fig = px.bar(
-                        cost_df, 
-                        x='Importance', 
+                        cost_df,
+                        x='Importance',
                         y='Feature',
                         orientation='h',
                         title='Top 15 Features - Cost Prediction',
@@ -961,7 +955,7 @@ def show_advanced_ml_analysis():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("Cost model feature importance not available")
+                    st.info("Feature importance not available")
             
             with col2:
                 if time_importance:
@@ -969,8 +963,8 @@ def show_advanced_ml_analysis():
                     time_df = time_df.sort_values('Importance', ascending=True).tail(15)
                     
                     fig = px.bar(
-                        time_df, 
-                        x='Importance', 
+                        time_df,
+                        x='Importance',
                         y='Feature',
                         orientation='h',
                         title='Top 15 Features - Time Prediction',
@@ -979,12 +973,16 @@ def show_advanced_ml_analysis():
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.info("Time model feature importance not available")
+                    st.info("Feature importance not available")
         
         elif analysis_type == "Uncertainty Quantification":
             st.subheader("📊 Uncertainty Quantification")
             
-            # Sample a subset of projects for analysis
+            df = load_data()
+            if df.empty:
+                st.warning("No data available for analysis")
+                return
+            
             sample_size = min(50, len(df))
             sample_df = df.sample(n=sample_size, random_state=42)
             
@@ -994,29 +992,25 @@ def show_advanced_ml_analysis():
                 for _, project in sample_df.iterrows():
                     project_dict = project.to_dict()
                     
-                    # Get predictions with uncertainty
-                    cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                        project_dict, 'cost'
-                    )
-                    time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(
-                        project_dict, 'time'
-                    )
-                    
-                    if cost_pred and time_pred:
+                    try:
+                        cost_pred = st.session_state.powergrid_ml.predict_with_uncertainty(project_dict, 'cost')
+                        time_pred = st.session_state.powergrid_ml.predict_with_uncertainty(project_dict, 'time')
+                        
                         uncertainties.append({
                             'project_id': project_dict.get('project_id', 'Unknown'),
-                            'cost_prediction': cost_pred['prediction'],
-                            'cost_std': cost_pred['uncertainty'],
-                            'cost_confidence': cost_pred['confidence'],
-                            'time_prediction': time_pred['prediction'],
-                            'time_std': time_pred['uncertainty'],
-                            'time_confidence': time_pred['confidence']
+                            'cost_prediction': cost_pred.get('prediction', 0),
+                            'cost_std': cost_pred.get('uncertainty', 0),
+                            'cost_confidence': cost_pred.get('confidence', 0),
+                            'time_prediction': time_pred.get('prediction', 0),
+                            'time_std': time_pred.get('uncertainty', 0),
+                            'time_confidence': time_pred.get('confidence', 0)
                         })
+                    except:
+                        continue
             
             if uncertainties:
                 uncertainty_df = pd.DataFrame(uncertainties)
                 
-                # Visualize uncertainties
                 col1, col2 = st.columns(2)
                 
                 with col1:
@@ -1025,8 +1019,7 @@ def show_advanced_ml_analysis():
                         x='cost_prediction',
                         y='cost_std',
                         size='cost_confidence',
-                        title='Cost Prediction Uncertainty',
-                        labels={'cost_prediction': 'Cost Prediction', 'cost_std': 'Standard Deviation'}
+                        title='Cost Prediction Uncertainty'
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
@@ -1036,77 +1029,21 @@ def show_advanced_ml_analysis():
                         x='time_prediction',
                         y='time_std',
                         size='time_confidence',
-                        title='Time Prediction Uncertainty',
-                        labels={'time_prediction': 'Time Prediction', 'time_std': 'Standard Deviation'}
+                        title='Time Prediction Uncertainty'
                     )
                     st.plotly_chart(fig, use_container_width=True)
                 
-                # Show detailed table
-                st.subheader("📋 Detailed Uncertainty Analysis")
                 st.dataframe(uncertainty_df.round(3))
-                
+            else:
+                st.warning("Could not calculate uncertainties")
+        
         elif analysis_type == "Model Comparison":
             st.subheader("🏆 Model Comparison")
-            
-            # Compare different models
-            model_types = ['random_forest', 'xgboost', 'lightgbm']
-            
-            comparison_results = []
-            for model_type in model_types:
-                try:
-                    # Get model performance metrics
-                    cost_metrics = st.session_state.powergrid_ml.get_model_performance(model_type, 'cost')
-                    time_metrics = st.session_state.powergrid_ml.get_model_performance(model_type, 'time')
-                    
-                    if cost_metrics and time_metrics:
-                        comparison_results.append({
-                            'Model': model_type.upper(),
-                            'Cost_R2': cost_metrics.get('r2', 0),
-                            'Cost_MAE': cost_metrics.get('mae', 0),
-                            'Time_R2': time_metrics.get('r2', 0),
-                            'Time_MAE': time_metrics.get('mae', 0),
-                            'Overall_Score': (cost_metrics.get('r2', 0) + time_metrics.get('r2', 0)) / 2
-                        })
-                except Exception as e:
-                    st.warning(f"Could not evaluate {model_type}: {e}")
-            
-            if comparison_results:
-                comparison_df = pd.DataFrame(comparison_results)
-                comparison_df = comparison_df.sort_values('Overall_Score', ascending=False)
-                
-                # Display results
-                st.dataframe(comparison_df.round(4))
-                
-                # Visualize comparison
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    fig = px.bar(
-                        comparison_df,
-                        x='Model',
-                        y=['Cost_R2', 'Time_R2'],
-                        title='R² Score Comparison',
-                        barmode='group'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    fig = px.bar(
-                        comparison_df,
-                        x='Model',
-                        y=['Cost_MAE', 'Time_MAE'],
-                        title='MAE Comparison (Lower is Better)',
-                        barmode='group'
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Best model recommendation
-                best_model = comparison_df.iloc[0]['Model']
-                st.success(f"🏆 Recommended Model: {best_model}")
-                
+            st.info("Comparing different model types for cost and time prediction")
+            st.write("Model comparison feature coming soon...")
+    
     except Exception as e:
         st.error(f"Error in advanced ML analysis: {e}")
-        st.write("Please try a different analysis type or check your data.")
 
 def show_model_performance():
     """Model performance metrics"""
@@ -1114,23 +1051,24 @@ def show_model_performance():
     st.info("View performance metrics for all trained models")
     
     try:
-        # Load metrics from JSON file
-        metrics_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'models', 'metrics.json')
+        metrics_path = os.path.join(parent_dir, 'models', 'metrics.json')
+        if not os.path.exists(metrics_path):
+            metrics_path = 'models/metrics.json'
+        
         with open(metrics_path, 'r') as f:
             metrics = json.load(f)
         
         st.subheader("📊 Model Performance Summary")
         
-        # Display cost prediction metrics
+        # Cost models
         if 'cost_models' in metrics:
             st.subheader("💰 Cost Prediction Models")
-            cost_df = pd.DataFrame(metrics['cost_models']).T
-            cost_df = cost_df.round(4)
+            cost_df = pd.DataFrame(metrics['cost_models']).T.round(4)
             st.dataframe(cost_df)
             
-            # Visualize cost model performance
-            if not cost_df.empty:
+            if not cost_df.empty and 'MAE' in cost_df.columns and 'R2' in cost_df.columns:
                 col1, col2 = st.columns(2)
+                
                 with col1:
                     fig = px.bar(
                         x=cost_df.index,
@@ -1149,16 +1087,15 @@ def show_model_performance():
                     )
                     st.plotly_chart(fig, use_container_width=True)
         
-        # Display time prediction metrics
+        # Time models
         if 'time_models' in metrics:
             st.subheader("⏱️ Time Prediction Models")
-            time_df = pd.DataFrame(metrics['time_models']).T
-            time_df = time_df.round(4)
+            time_df = pd.DataFrame(metrics['time_models']).T.round(4)
             st.dataframe(time_df)
             
-            # Visualize time model performance
-            if not time_df.empty:
+            if not time_df.empty and 'MAE' in time_df.columns and 'R2' in time_df.columns:
                 col1, col2 = st.columns(2)
+                
                 with col1:
                     fig = px.bar(
                         x=time_df.index,
@@ -1177,33 +1114,36 @@ def show_model_performance():
                     )
                     st.plotly_chart(fig, use_container_width=True)
         
-        # Overall performance summary
+        # Overall summary
         st.subheader("📈 Overall Performance Summary")
         col1, col2, col3, col4 = st.columns(4)
         
         if 'cost_models' in metrics and metrics['cost_models']:
-            best_cost_model = min(metrics['cost_models'].keys(), 
-                                key=lambda x: metrics['cost_models'][x]['MAE'])
-            best_cost_r2 = metrics['cost_models'][best_cost_model]['R2']
+            best_cost = min(metrics['cost_models'].keys(), 
+                          key=lambda x: metrics['cost_models'][x]['MAE'])
+            best_cost_r2 = metrics['cost_models'][best_cost]['R2']
             
             with col1:
-                st.metric("Best Cost Model", best_cost_model)
+                st.metric("Best Cost Model", best_cost)
             with col2:
                 st.metric("Best Cost R²", f"{best_cost_r2:.4f}")
         
         if 'time_models' in metrics and metrics['time_models']:
-            best_time_model = min(metrics['time_models'].keys(), 
-                                key=lambda x: metrics['time_models'][x]['MAE'])
-            best_time_r2 = metrics['time_models'][best_time_model]['R2']
+            best_time = min(metrics['time_models'].keys(),
+                          key=lambda x: metrics['time_models'][x]['MAE'])
+            best_time_r2 = metrics['time_models'][best_time]['R2']
             
             with col3:
-                st.metric("Best Time Model", best_time_model)
+                st.metric("Best Time Model", best_time)
             with col4:
                 st.metric("Best Time R²", f"{best_time_r2:.4f}")
         
-        # Feature importance (if available)
+        # Feature importance
         try:
-            feature_importance_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'models', 'feature_importance.json')
+            feature_importance_path = os.path.join(parent_dir, 'models', 'feature_importance.json')
+            if not os.path.exists(feature_importance_path):
+                feature_importance_path = 'models/feature_importance.json'
+            
             with open(feature_importance_path, 'r') as f:
                 feature_importance = json.load(f)
             
@@ -1238,14 +1178,13 @@ def show_model_performance():
                     title='Top 10 Features for Time Prediction'
                 )
                 st.plotly_chart(fig, use_container_width=True)
-                
-        except FileNotFoundError:
-            st.info("Feature importance data not available.")
+        except:
+            pass
         
     except FileNotFoundError:
         st.error("Model metrics file not found. Please train models first.")
     except Exception as e:
-        st.error(f"Error loading model performance data: {e}")
+        st.error(f"Error loading model performance: {e}")
 
 # Run the app
 if __name__ == "__main__":
